@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from text3d.flatten import build_name_index, flatten_by_name, normalize_for_cli
+from print3d.flatten import build_name_index, flatten_by_name, normalize_for_cli
 
 
 def test_inherits_and_include(tmp_path: Path):

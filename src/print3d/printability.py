@@ -20,8 +20,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from text3d.dfm import read_stl
-from text3d.project import read_plate_gcode
+from print3d.dfm import read_stl
+from print3d.project import read_plate_gcode
 
 # Slope measured from the horizontal plane: 0 deg is a flat ceiling, 90 deg a
 # vertical wall. The classic 45 deg rule is the default.

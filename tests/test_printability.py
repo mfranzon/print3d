@@ -2,7 +2,7 @@ import math
 from pathlib import Path
 
 from conftest import write_cube_stl
-from text3d.printability import (
+from print3d.printability import (
     BED_CHAMFER_MM,
     advise,
     analyze_mesh,

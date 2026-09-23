@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from text3d.repair_3mf import repair_bambu_3mf
+from print3d.repair_3mf import repair_bambu_3mf
 
 
 class StudioError(RuntimeError):

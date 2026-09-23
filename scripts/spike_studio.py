@@ -13,9 +13,9 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from text3d.flatten import flatten_x2d  # noqa: E402
-from text3d.project import extract_plate_png, inspect_project  # noqa: E402
-from text3d.studio import SliceRequest, run_slice, slice_plan  # noqa: E402
+from print3d.flatten import flatten_x2d  # noqa: E402
+from print3d.project import extract_plate_png, inspect_project  # noqa: E402
+from print3d.studio import SliceRequest, run_slice, slice_plan  # noqa: E402
 
 
 def studio_conf_mtime() -> float | None:

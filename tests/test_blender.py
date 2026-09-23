@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from text3d.blender import BlenderError, find_blender, run_model_script, scaffold_script
+from print3d.blender import BlenderError, find_blender, run_model_script, scaffold_script
 
 
 def test_scaffold_carries_the_brief(tmp_path: Path):
@@ -28,7 +28,7 @@ def test_find_blender_prefers_the_env_override(tmp_path: Path, monkeypatch):
 
 def test_find_blender_explains_itself_when_absent(monkeypatch):
     monkeypatch.setenv("BLENDER_BIN", "/nonexistent/blender")
-    monkeypatch.setattr("text3d.blender.shutil.which", lambda *a, **k: None)
+    monkeypatch.setattr("print3d.blender.shutil.which", lambda *a, **k: None)
     monkeypatch.setattr(Path, "is_file", lambda self: False)
     with pytest.raises(BlenderError, match="BLENDER_BIN"):
         find_blender()

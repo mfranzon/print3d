@@ -5,7 +5,7 @@ supplies the empty scene, the export, and the bed placement around it.
 
 Contract for a model script:
   - 1 Blender unit == 1 mm.
-  - `params` is in scope as a dict (also importable via `bpy.types.Scene.text3d_params`).
+  - `params` is in scope as a dict (also importable via `bpy.types.Scene.print3d_params`).
   - Leave the finished geometry as the mesh objects in the scene. Helpers,
     empties and cameras are ignored.
 """
@@ -54,7 +54,7 @@ def find_blender(search_path: str | None = None) -> Path:
     )
 
 
-# Runs inside Blender's own Python, which cannot import text3d.
+# Runs inside Blender's own Python, which cannot import print3d.
 _HARNESS = r'''
 import bpy, json, sys, runpy, traceback
 
@@ -63,7 +63,7 @@ script_path, out_path, params_json, result_path = argv[:4]
 params = json.loads(params_json)
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
-bpy.types.Scene.text3d_params = params
+bpy.types.Scene.print3d_params = params
 
 try:
     runpy.run_path(script_path, init_globals={"params": params}, run_name="__main__")
@@ -73,7 +73,7 @@ except Exception:
 
 meshes = [o for o in bpy.context.scene.objects if o.type == "MESH"]
 if not meshes:
-    print("text3d: the model script left no mesh objects in the scene")
+    print("print3d: the model script left no mesh objects in the scene")
     sys.exit(4)
 
 # Bake modifiers so what we measure is what gets sliced.
@@ -133,7 +133,7 @@ with open(result_path, "w") as handle:
         "non_manifold_edges": open_edges,
         "recentre_offset_mm": list(offset),
     }, handle)
-print("text3d: exported", out_path)
+print("print3d: exported", out_path)
 '''
 
 
@@ -202,7 +202,7 @@ def _tail(text: str, lines: int = 25) -> str:
 SCAFFOLD = '''"""Blender model for: {prompt}
 
 1 Blender unit == 1 mm. `params` holds the brief. Leave the finished geometry
-as mesh objects; text3d exports, centres and drops it onto the bed.
+as mesh objects; print3d exports, centres and drops it onto the bed.
 """
 
 import bpy

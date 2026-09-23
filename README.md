@@ -2,7 +2,7 @@
 
 Turn an idea into a Bambu Studio project for a **Bambu Lab X2D (0.4 mm nozzle)**.
 
-You (or an agent) write a Blender script that builds the part. `text3d` runs it,
+You (or an agent) write a Blender script that builds the part. `print3d` runs it,
 checks the mesh, slices it with Bambu Studio, and tells you what to fix. Repeat
 until the checks pass, then open the `.3mf` in Studio and print from there.
 
@@ -24,7 +24,7 @@ git clone git@github.com:mfranzon/print3d.git
 cd print3d
 python3 -m venv .venv
 .venv/bin/pip install -e '.[dev]'
-.venv/bin/text3d status
+.venv/bin/print3d status
 ```
 
 `status` shows where Blender and Studio were found. On macOS this is automatic;
@@ -33,7 +33,7 @@ otherwise set `BLENDER_BIN` and `BAMBU_STUDIO_BIN`.
 ## Use
 
 ```bash
-.venv/bin/text3d make "a 40mm nameplate that says MARCO" --script examples/nameplate.py
+.venv/bin/print3d make "a 40mm nameplate that says MARCO" --script examples/nameplate.py
 ```
 
 This models, checks, slices and prints a JSON report. It exits 1 if any check
@@ -61,7 +61,7 @@ Plain bpy that builds geometry. `examples/nameplate.py` is the reference.
 - 1 Blender unit = 1 mm.
 - `params` holds the brief: `prompt`, `slug`, `text`, `intent`, `size_mm`,
   `color`, `material`.
-- Leave the part as mesh objects. `text3d` joins them, cleans the mesh, centres
+- Leave the part as mesh objects. `print3d` joins them, cleans the mesh, centres
   it and puts it on the bed.
 - Orientation is up to you. Studio's auto-orient is off, so the part prints the
   way you model it.
@@ -92,5 +92,5 @@ Then type `/print3d a 40mm nameplate that says MARCO`.
 
 ```bash
 .venv/bin/python -m pytest -q                      # unit tests
-TEXT3D_STUDIO_IT=1 .venv/bin/python -m pytest -q   # also runs Blender and Studio
+PRINT3D_STUDIO_IT=1 .venv/bin/python -m pytest -q   # also runs Blender and Studio
 ```

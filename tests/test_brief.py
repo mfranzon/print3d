@@ -1,4 +1,4 @@
-from text3d.brief import parse_brief
+from print3d.brief import parse_brief
 
 
 def test_cube_brief():

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from text3d.project import inspect_project
+from print3d.project import inspect_project
 
 GOLDEN = Path(__file__).parent / "fixtures" / "cube_20mm.gcode.3mf"
 

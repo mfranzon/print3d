@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from text3d.studio import SliceRequest, build_project_command, build_slice_command
+from print3d.studio import SliceRequest, build_project_command, build_slice_command
 
 
 def _request(tmp_path: Path) -> SliceRequest:

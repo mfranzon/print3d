@@ -2,7 +2,7 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 from zipfile import ZipFile
 
-from text3d.repair_3mf import is_well_formed_model_settings, repair_bambu_3mf
+from print3d.repair_3mf import is_well_formed_model_settings, repair_bambu_3mf
 
 GOLDEN = Path(__file__).parent / "fixtures" / "cube_20mm.gcode.3mf"
 

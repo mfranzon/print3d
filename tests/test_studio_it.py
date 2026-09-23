@@ -3,12 +3,12 @@ from pathlib import Path
 
 import pytest
 
-from text3d.paths import repo_root
-from text3d.pipeline import run_job
+from print3d.paths import repo_root
+from print3d.pipeline import run_job
 
 pytestmark = pytest.mark.skipif(
-    os.environ.get("TEXT3D_STUDIO_IT") != "1",
-    reason="Set TEXT3D_STUDIO_IT=1 to run a live Blender model and Bambu Studio slice",
+    os.environ.get("PRINT3D_STUDIO_IT") != "1",
+    reason="Set PRINT3D_STUDIO_IT=1 to run a live Blender model and Bambu Studio slice",
 )
 
 

@@ -7,8 +7,8 @@ disable-model-invocation: true
 
 # /print3d — idea to a printable X2D part
 
-Run everything from the repo root (the parent of this skill folder). `text3d` below means
-`.venv/bin/python -m text3d`.
+Run everything from the repo root (the parent of this skill folder). `print3d` below means
+`.venv/bin/python -m print3d`.
 
 ```
 idea / image / text  →  model.py (Blender)  →  mesh  →  DFM + printability
@@ -31,7 +31,7 @@ unprintable.
 ## 2. Scaffold
 
 ```bash
-text3d make "<prompt>"
+print3d make "<prompt>"
 ```
 
 With no model yet this writes `jobs/<slug>/model.py` and stops, naming the path.
@@ -57,7 +57,7 @@ asks for.
 ## 4. Run the loop until it goes green
 
 ```bash
-text3d make "<prompt>"
+print3d make "<prompt>"
 ```
 
 Models, DFM-checks, slices with the pinned X2D presets, and reports. The run is
@@ -90,7 +90,7 @@ if the preview is not what they wanted.
 
 ## Done when
 
-`text3d make` exits 0, no note is at `error`, you have looked at the plate PNG,
+`print3d make` exits 0, no note is at `error`, you have looked at the plate PNG,
 and the user has the `.3mf` path.
 
 ## The machine

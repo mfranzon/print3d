@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from conftest import ascii_stl_cube, write_cube_stl
-from text3d.dfm import DfmError, check_mesh, require_printable
+from print3d.dfm import DfmError, check_mesh, require_printable
 
 
 def test_cube_is_printable(tmp_path: Path):

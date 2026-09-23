@@ -1,4 +1,4 @@
-"""text3d command line."""
+"""print3d command line."""
 
 from __future__ import annotations
 
@@ -7,14 +7,14 @@ import json
 import sys
 from pathlib import Path
 
-from text3d.blender import BlenderError, find_blender, run_model_script
-from text3d.brief import parse_brief
-from text3d.flatten import flatten_x2d
-from text3d.paths import default_profiles_dir
-from text3d.pipeline import _model_params, run_job
-from text3d.printability import advise, analyze_mesh, analyze_slice
-from text3d.project import inspect_project
-from text3d.studio import SliceRequest, find_studio, slice_plan
+from print3d.blender import BlenderError, find_blender, run_model_script
+from print3d.brief import parse_brief
+from print3d.flatten import flatten_x2d
+from print3d.paths import default_profiles_dir
+from print3d.pipeline import _model_params, run_job
+from print3d.printability import advise, analyze_mesh, analyze_slice
+from print3d.project import inspect_project
+from print3d.studio import SliceRequest, find_studio, slice_plan
 
 
 def _print_json(payload: object) -> None:
@@ -112,7 +112,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="text3d", description="Idea to a reviewable Bambu Studio project for an X2D"
+        prog="print3d", description="Idea to a reviewable Bambu Studio project for an X2D"
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
 

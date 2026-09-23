@@ -82,5 +82,5 @@ constant rather than a rewrite.
 
 ## Checking without a full run
 
-`text3d check <mesh.stl> [--project <job>.gcode.3mf]` reports the same
+`print3d check <mesh.stl> [--project <job>.gcode.3mf]` reports the same
 printability metrics and advice for a mesh you already have.

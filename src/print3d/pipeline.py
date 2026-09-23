@@ -16,13 +16,13 @@ import time
 from pathlib import Path
 from typing import Any
 
-from text3d.blender import BlenderError, run_model_script, scaffold_script
-from text3d.brief import PrintBrief, parse_brief
-from text3d.dfm import require_printable
-from text3d.paths import default_jobs_dir, default_profiles_dir
-from text3d.printability import advise, analyze_mesh, analyze_slice, worst_severity
-from text3d.project import extract_plate_png, inspect_project
-from text3d.studio import SliceRequest, run_slice, slice_plan
+from print3d.blender import BlenderError, run_model_script, scaffold_script
+from print3d.brief import PrintBrief, parse_brief
+from print3d.dfm import require_printable
+from print3d.paths import default_jobs_dir, default_profiles_dir
+from print3d.printability import advise, analyze_mesh, analyze_slice, worst_severity
+from print3d.project import extract_plate_png, inspect_project
+from print3d.studio import SliceRequest, run_slice, slice_plan
 
 MODEL_SCRIPT = "model.py"
 HISTORY = "history.jsonl"
@@ -88,7 +88,7 @@ def run_job(
     for required in ("machine.json", "process.json", "filament.json"):
         if not (profiles / required).is_file():
             raise PipelineError(
-                f"Pinned profile missing: {profiles / required}. Run: python -m text3d flatten"
+                f"Pinned profile missing: {profiles / required}. Run: python -m print3d flatten"
             )
 
     report: dict[str, Any] = {"brief": brief.as_dict(), "job_dir": str(job_dir)}
