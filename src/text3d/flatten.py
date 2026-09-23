@@ -208,6 +208,14 @@ def normalize_for_cli(flat: dict[str, Any], kind: ProfileKind, leaf_name: str) -
     flat["type"] = kind
 
 
+def _home_relative(path: Path) -> str:
+    """Keep the user's home directory out of committed provenance."""
+    try:
+        return "~/" + str(path.relative_to(Path.home()))
+    except ValueError:
+        return str(path)
+
+
 def write_profile(path: Path, data: dict[str, Any]) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
@@ -253,7 +261,7 @@ def flatten_x2d(
         filament_paths.append(write_profile(output_dir / name, filament))
 
     provenance = {
-        "profiles_root": str(root),
+        "profiles_root": _home_relative(root),
         "machine": machine_leaf,
         "process": process_leaf,
         "filaments": filaments,
