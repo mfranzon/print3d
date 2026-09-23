@@ -1,0 +1,14 @@
+Pinned Bambu Studio profiles for Bambu Lab X2D 0.4 mm.
+
+Studio version: 02.08.02.61
+Source tree: ~/Library/Application Support/BambuStudio/system/BBL
+Machine: Bambu Lab X2D 0.4 nozzle
+Process: 0.20mm Standard @BBL X2D
+Filament: Bambu PLA Basic @BBL X2D 0.4 nozzle
+Bed: Textured PEI Plate
+
+These JSON files are flattened (inherits + include resolved, from=User)
+because the Studio CLI does not walk the GUI inheritance chain.
+
+Rebuild with: python -m text3d flatten
+Golden cube slice: tests/fixtures/cube_20mm.gcode.3mf (100 layers, 3.63 g, 13m 52s)

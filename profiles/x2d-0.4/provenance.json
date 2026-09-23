@@ -1,0 +1,15 @@
+{
+  "profiles_root": "~/Library/Application Support/BambuStudio/system",
+  "machine": "Bambu Lab X2D 0.4 nozzle",
+  "process": "0.20mm Standard @BBL X2D",
+  "filaments": [
+    "Bambu PLA Basic @BBL X2D 0.4 nozzle"
+  ],
+  "bed_type": "Textured PEI Plate",
+  "cli_overlay_applied": false,
+  "machine_keys": 118,
+  "process_keys": 197,
+  "filament_keys": [
+    139
+  ]
+}

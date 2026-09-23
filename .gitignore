@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+jobs/
+bambu-printers.json
+.DS_Store
+*.log
+scratch/
+result.json
+*.rewriting

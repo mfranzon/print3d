@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "text3d"
+version = "0.1.0"
+description = "Idea to a reviewable Bambu Studio project for a Bambu Lab X2D"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+text3d = "text3d.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
