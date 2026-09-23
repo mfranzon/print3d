@@ -1,4 +1,4 @@
-# text-3d
+# print3d
 
 Turn an idea into a Bambu Studio project for a **Bambu Lab X2D (0.4 mm nozzle)**.
 
@@ -20,8 +20,8 @@ Needs [Blender](https://www.blender.org/download/) 4.2+ and
 [Bambu Studio](https://bambulab.com/en/download/studio).
 
 ```bash
-git clone git@github.com:mfranzon/text-3d.git
-cd text-3d
+git clone git@github.com:mfranzon/print3d.git
+cd print3d
 python3 -m venv .venv
 .venv/bin/pip install -e '.[dev]'
 .venv/bin/text3d status

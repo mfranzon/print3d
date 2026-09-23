@@ -7,7 +7,7 @@ disable-model-invocation: true
 
 # /print3d — idea to a printable X2D part
 
-Run everything from the `text-3d` repo root. `text3d` below means
+Run everything from the repo root (the parent of this skill folder). `text3d` below means
 `.venv/bin/python -m text3d`.
 
 ```
