@@ -13,7 +13,6 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from text3d.cube import write_cube_stl  # noqa: E402
 from text3d.flatten import flatten_x2d  # noqa: E402
 from text3d.project import extract_plate_png, inspect_project  # noqa: E402
 from text3d.studio import SliceRequest, run_slice, slice_plan  # noqa: E402
@@ -28,7 +27,7 @@ def main() -> int:
     profiles = ROOT / "profiles" / "x2d-0.4"
     fixtures = ROOT / "tests" / "fixtures"
     scratch = ROOT / "scratch" / "spike"
-    mesh = write_cube_stl(fixtures / "cube_20mm.stl", 20.0)
+    mesh = fixtures / "cube_20mm.stl"
     flattened = flatten_x2d(output_dir=profiles)
     print(json.dumps({"flatten": flattened["provenance"]}, indent=2))
 

@@ -7,7 +7,6 @@ from dataclasses import asdict, dataclass
 from typing import Any, Literal
 
 Intent = Literal["sign", "utility", "enclosure", "figurine"]
-Supports = Literal["auto", "none", "tree", "normal"]
 
 MM_RE = re.compile(r"(\d+(?:\.\d+)?)\s*mm", re.IGNORECASE)
 SAYS_RE = re.compile(
@@ -26,9 +25,6 @@ class PrintBrief:
     target_size_mm: tuple[float, float, float] | None
     material: str
     color_name: str | None
-    supports: Supports
-    layer_height_mm: float
-    copies: int
     text: str | None
     assumptions: tuple[str, ...]
 
@@ -101,9 +97,6 @@ def parse_brief(prompt: str, *, color: str | None = None) -> PrintBrief:
         target_size_mm=size,
         material="PLA",
         color_name=color_name,
-        supports="none" if intent in {"sign", "utility"} else "auto",
-        layer_height_mm=0.20,
-        copies=1,
         text=plate_text,
         assumptions=tuple(assumptions),
     )

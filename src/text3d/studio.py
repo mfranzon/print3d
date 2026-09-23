@@ -130,7 +130,13 @@ def _request_dict(request: SliceRequest) -> dict[str, Any]:
 
 
 def slice_plan(request: SliceRequest, *, studio: Path | None = None) -> dict[str, Any]:
-    binary = studio or find_studio()
+    binary = studio
+    if binary is None:
+        # A plan is only a preview; name the binary even when it is not installed.
+        try:
+            binary = find_studio()
+        except StudioError:
+            binary = Path("bambu-studio")
     return {
         "dry_run": True,
         "studio": str(binary),
@@ -163,7 +169,8 @@ def run_slice(
     studio: Path | None = None,
     timeout_s: float = 180,
 ) -> dict[str, Any]:
-    plan = slice_plan(request, studio=studio)
+    binary = studio or find_studio()
+    plan = slice_plan(request, studio=binary)
     plan["dry_run"] = False
     request.datadir.mkdir(parents=True, exist_ok=True)
     request.output_dir.mkdir(parents=True, exist_ok=True)
@@ -171,7 +178,6 @@ def run_slice(
     project = project_3mf_path(request)
     project.parent.mkdir(parents=True, exist_ok=True)
 
-    binary = Path(plan["studio"])
     project_result = _run(build_project_command(binary, request), timeout_s)
     exported_project = request.output_dir / project.name
     _require_file(exported_project, project_result, "project export")

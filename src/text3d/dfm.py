@@ -39,8 +39,7 @@ class DfmReport:
     warnings: tuple[str, ...]
 
     def as_dict(self) -> dict[str, Any]:
-        payload = asdict(self)
-        return payload
+        return asdict(self)
 
 
 def read_stl(path: Path) -> list[tuple[tuple[float, float, float], ...]]:
@@ -141,7 +140,6 @@ def check_mesh(path: Path, *, bed_mm: tuple[float, float, float] = X2D_BED_MM) -
         errors.append("Mesh is not manifold (an edge is not shared by exactly two triangles).")
     if not stats.on_bed:
         warnings.append(f"Lowest Z is {stats.bbox_min[2]:.3f} mm; Studio --ensure-on-bed will lift it.")
-    warnings.append("Minimum wall thickness is not checked on triangle meshes.")
     return DfmReport(ok=not errors, stats=stats, errors=tuple(errors), warnings=tuple(warnings))
 
 

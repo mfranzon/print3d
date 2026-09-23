@@ -72,7 +72,8 @@ doubles, fills holes, recalculates normals, triangulates, centres the part and
 drops it on the bed before exporting.
 
 - **1 Blender unit == 1 mm.**
-- `params` is in scope: `prompt`, `slug`, `text`, `intent`, `size_mm`, `colour`.
+- `params` is in scope: `prompt`, `slug`, `text`, `intent`, `size_mm`, `color`,
+  `material`.
 - Orientation is yours. Studio's auto-orient is **off**, so what you model is
   what prints - otherwise the slicer would quietly rotate the part and every
   overhang note below would be about geometry that never gets printed.

@@ -6,8 +6,8 @@ Studio's GUI resolves `inherits` and `include` at runtime. The CLI does not.
 
 from __future__ import annotations
 
-import hashlib
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any, Iterable, Literal
@@ -27,9 +27,8 @@ class FlattenError(RuntimeError):
 
 
 def detect_profiles_root(slicer_path: str | None = None) -> Path:
-    env = Path(__file__).resolve()
     candidates: list[Path] = []
-    env_root = __import__("os").environ.get("BAMBU_PROFILES_ROOT", "").strip()
+    env_root = os.environ.get("BAMBU_PROFILES_ROOT", "").strip()
     if env_root:
         candidates.append(Path(env_root).expanduser())
     candidates.append(Path.home() / "Library/Application Support/BambuStudio/system")
@@ -273,7 +272,3 @@ def flatten_x2d(
         "filament_paths": [str(path) for path in filament_paths],
         "provenance": provenance,
     }
-
-
-def profile_hash(path: Path) -> str:
-    return hashlib.sha1(path.read_bytes()).hexdigest()[:12]

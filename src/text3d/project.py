@@ -172,23 +172,6 @@ def extract_plate_png(path: Path, dest: Path, plate: int = 1) -> Path | None:
         return dest
 
 
-def slice_info_filament_g(slice_info: str | None) -> float | None:
-    if not slice_info:
-        return None
-    try:
-        root = ET.fromstring(slice_info)
-    except ET.ParseError:
-        return None
-    total = 0.0
-    found = False
-    for filament in root.iter("filament"):
-        used = filament.attrib.get("used_g") or filament.attrib.get("weight")
-        if used:
-            total += float(used)
-            found = True
-    return total if found else None
-
-
 def read_plate_gcode(path: Path, plate: int = 1) -> str:
     """The raw gcode for one plate of a sliced project."""
     member = f"Metadata/plate_{plate}.gcode"

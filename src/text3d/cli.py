@@ -11,7 +11,7 @@ from text3d.blender import BlenderError, find_blender, run_model_script
 from text3d.brief import parse_brief
 from text3d.flatten import flatten_x2d
 from text3d.paths import default_profiles_dir
-from text3d.pipeline import run_job
+from text3d.pipeline import _model_params, run_job
 from text3d.printability import advise, analyze_mesh, analyze_slice
 from text3d.project import inspect_project
 from text3d.studio import SliceRequest, find_studio, slice_plan
@@ -37,10 +37,7 @@ def cmd_make(args: argparse.Namespace) -> int:
 def cmd_model(args: argparse.Namespace) -> int:
     params = json.loads(args.params) if args.params else {}
     if args.prompt:
-        brief = parse_brief(args.prompt)
-        params.setdefault("text", brief.text)
-        params.setdefault("slug", brief.slug)
-        params.setdefault("size_mm", list(brief.target_size_mm) if brief.target_size_mm else None)
+        params = {**_model_params(parse_brief(args.prompt)), **params}
     _print_json(run_model_script(Path(args.script), Path(args.out), params=params))
     return 0
 
@@ -49,7 +46,7 @@ def cmd_slice(args: argparse.Namespace) -> int:
     mesh = Path(args.mesh)
     report = run_job(args.prompt or f"slice {mesh.name}", mesh=mesh, execute=not args.dry_run)
     _print_json(report)
-    return 0
+    return 1 if report.get("severity") == "error" else 0
 
 
 def cmd_check(args: argparse.Namespace) -> int:
