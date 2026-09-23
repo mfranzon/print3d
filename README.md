@@ -1,112 +1,96 @@
 # text-3d
 
-Idea to a reviewable **Bambu Lab X2D 0.4 mm** project.
+Turn an idea into a Bambu Studio project for a **Bambu Lab X2D (0.4 mm nozzle)**.
 
-An agent (or you) writes a Blender model script, the CLI runs it headless,
-checks the mesh, slices it with the official Bambu Studio CLI, and reports what
-the slice says about printability. Fix the script, run again, repeat until it is
-clean.
+You (or an agent) write a Blender script that builds the part. `text3d` runs it,
+checks the mesh, slices it with Bambu Studio, and tells you what to fix. Repeat
+until the checks pass, then open the `.3mf` in Studio and print from there.
 
 ```
-idea / image / text  ->  Blender model script  ->  mesh  ->  DFM + printability
-                              ^                                     |
-                              +------- advice says what to fix ------+
-                                              |
-                                        slice -> .3mf -> review in Studio
+idea -> Blender script -> mesh -> checks -> slice -> .3mf -> print from Studio
+             ^                      |
+             +---- fix the script --+
 ```
 
-**It stops at review.** Nothing in this repo talks to the printer. When the
-slice looks right, open the `.3mf` in Bambu Studio and print it from there.
+Nothing here talks to the printer.
 
 ## Install
+
+Needs [Blender](https://www.blender.org/download/) 4.2+ and
+[Bambu Studio](https://bambulab.com/en/download/studio).
 
 ```bash
 git clone git@github.com:mfranzon/text-3d.git
 cd text-3d
 python3 -m venv .venv
 .venv/bin/pip install -e '.[dev]'
-.venv/bin/python -m text3d status
+.venv/bin/text3d status
 ```
 
-Needs [Blender](https://www.blender.org/download/) 4.2+ and
-[Bambu Studio](https://bambulab.com/en/download/studio). Both are found
-automatically on macOS; otherwise set `BLENDER_BIN` and `BAMBU_STUDIO_BIN`.
-X2D 0.4 presets ship in `profiles/x2d-0.4/`. Other printers:
-`python -m text3d flatten` against that machine's Studio install.
+`status` shows where Blender and Studio were found. On macOS this is automatic;
+otherwise set `BLENDER_BIN` and `BAMBU_STUDIO_BIN`.
 
 ## Use
 
 ```bash
-.venv/bin/python -m text3d make "a 40mm nameplate that says MARCO" --script examples/nameplate.py
+.venv/bin/text3d make "a 40mm nameplate that says MARCO" --script examples/nameplate.py
 ```
 
-With no `--script`, a starter `jobs/<slug>/model.py` is written for you to fill in.
+This models, checks, slices and prints a JSON report. It exits 1 if any check
+fails. Without `--script`, it writes a starter `jobs/<slug>/model.py` for you to
+fill in and run again.
 
-```bash
-.venv/bin/python -m text3d model examples/nameplate.py out.stl --prompt "..."  # model only
-.venv/bin/python -m text3d slice path/to/model.stl                             # slice a mesh
-.venv/bin/python -m text3d check out.stl --project job.gcode.3mf               # printability only
-.venv/bin/python -m text3d inspect tests/fixtures/cube_20mm.gcode.3mf
-```
+Output lands in `jobs/<slug>/`. Open `slice/<slug>.3mf` in Studio. The
+`.gcode.3mf` next to it is the sliced job and won't open in the Prepare tab.
 
-`make` exits 1 when a check comes back at `error` severity.
+Other commands:
+
+| Command | What it does |
+| --- | --- |
+| `model script.py out.stl` | Run a Blender script to an STL |
+| `slice model.stl` | Check and slice an existing mesh |
+| `check model.stl` | Printability checks only |
+| `inspect job.gcode.3mf` | Time, filament and layers of a sliced job |
+| `plan model.stl out.gcode.3mf` | Show the Studio command without running it |
+| `flatten` | Rebuild the X2D presets in `profiles/x2d-0.4/` |
+
+## Writing a model script
+
+Plain bpy that builds geometry. `examples/nameplate.py` is the reference.
+
+- 1 Blender unit = 1 mm.
+- `params` holds the brief: `prompt`, `slug`, `text`, `intent`, `size_mm`,
+  `color`, `material`.
+- Leave the part as mesh objects. `text3d` joins them, cleans the mesh, centres
+  it and puts it on the bed.
+- Orientation is up to you. Studio's auto-orient is off, so the part prints the
+  way you model it.
+
+More recipes and gotchas: `skill/references/modelling.md`.
+
+## What gets checked
+
+- **The mesh:** overhangs steeper than 45°, bed contact, tall-and-narrow parts,
+  parts too thin to print. Supports are off in the pinned preset, so an overhang
+  is a real defect.
+- **The slice:** print time, filament, and how much material each layer adds.
+
+Every problem comes with a `fix` telling you what to change in the script.
+`jobs/<slug>/history.jsonl` keeps a record of each run.
 
 ## The /print3d skill
 
-`skill/` is an agent skill wrapping the whole loop: read the brief, write the
-model, run until the checks go green, look at the plate, hand over the `.3mf`.
-It is user-invoked, so it fires only when you type it.
+`skill/` is a Claude Code skill that runs the whole loop for you. Install it:
 
 ```bash
 ln -sfn "$(pwd)/skill" ~/.claude/skills/print3d
 ```
 
-Then `/print3d a 40mm nameplate that says MARCO`. The bpy recipes and the
-gotchas live in `skill/references/modelling.md`.
-
-## Model scripts
-
-A model script is plain bpy that builds geometry and nothing else. The harness
-supplies an empty scene and, afterwards, joins the mesh objects, removes
-doubles, fills holes, recalculates normals, triangulates, centres the part and
-drops it on the bed before exporting.
-
-- **1 Blender unit == 1 mm.**
-- `params` is in scope: `prompt`, `slug`, `text`, `intent`, `size_mm`, `color`,
-  `material`.
-- Orientation is yours. Studio's auto-orient is **off**, so what you model is
-  what prints - otherwise the slicer would quietly rotate the part and every
-  overhang note below would be about geometry that never gets printed.
-
-`examples/nameplate.py` is the reference.
-
-## What the checks look at
-
-Two independent signals, because neither is sufficient alone:
-
-- **The mesh** - overhang area against the 45 deg rule, bed contact, slenderness,
-  thinnest dimension. This is where most of the weight sits: the pinned process
-  has `enable_support = 0`, so the slicer never warns about an overhang, it just
-  prints it badly.
-- **The slice** - time, filament, and material per layer recovered from the
-  gcode. The Studio CLI strips `;TYPE:` feature comments, so a material jump is
-  only reported when the mesh independently shows an unsupported region; a
-  sparse-infill-to-top-shell transition looks identical otherwise.
-
-Every note carries a `fix` phrased as a change to make in the model script.
-`jobs/<slug>/history.jsonl` records each iteration.
-
-## Layout
-
-- `src/text3d/` pipeline, Blender runner, DFM, printability, Studio wrapper, 3mf repair
-- `examples/` reference model scripts
-- `profiles/x2d-0.4/` flattened Studio machine/process/filament JSON
-- `skill/` the `/print3d` agent skill
-- `jobs/` run artifacts (gitignored)
+Then type `/print3d a 40mm nameplate that says MARCO`.
 
 ## Tests
 
 ```bash
-.venv/bin/python -m pytest -q                          # unit
-TEXT3D_STUDIO_IT=1 .venv/bin/python -m pytest -q       # plus live Blender and Studio
+.venv/bin/python -m pytest -q                      # unit tests
+TEXT3D_STUDIO_IT=1 .venv/bin/python -m pytest -q   # also runs Blender and Studio
 ```
