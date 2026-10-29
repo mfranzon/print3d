@@ -1,11 +1,11 @@
 ---
 name: print3d
-description: Model a part in Blender from an idea, a photo of an object, or the shop listing of something you would otherwise buy, slice it for the Bambu X2D, and iterate until it prints clean and matches the photo.
+description: Model a part in Blender from an idea, a photo of an object, or the shop listing of something you would otherwise buy, slice it for the Elegoo Centauri Carbon (ElegooSlicer) or the Bambu X2D, and iterate until it prints clean and matches the photo.
 argument-hint: "[what to make, a photo of the object, or a shop link]"
 disable-model-invocation: true
 ---
 
-# /print3d — idea to a printable X2D part
+# /print3d — idea to a printable part
 
 `print3d` below is the print3d command line. When you have the print3d MCP
 tools, use those of the same names instead: they return the plate preview and

@@ -29,8 +29,10 @@ from print3d.viewer import build_viewer
 from print3d.printability import advise, analyze_mesh, analyze_slice, dfm_advice, worst_severity
 
 INSTRUCTIONS = """\
-print3d turns an idea, or a photo of an object, into a Bambu Studio project for a
-Bambu Lab X2D. You write a Blender (bpy) model script; `make` runs it, checks the
+print3d turns an idea, or a photo of an object, into a sliced print project for
+an Elegoo Centauri Carbon or Centauri Carbon 2 (via ElegooSlicer), or a Bambu
+Lab X2D (via Bambu Studio). You write a Blender (bpy) model script; `make` runs
+it, checks the
 mesh, slices it and returns advice, each note with the fix to apply to the script.
 Iterate until no note is at `error`, then hand the user the .3mf path.
 

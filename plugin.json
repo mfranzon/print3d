@@ -2,7 +2,7 @@
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "print3d",
   "version": "0.1.0",
-  "description": "Idea, photo or shop listing to a sliced Bambu Studio project for a Bambu Lab X2D, with a 3D view of the part to rotate. Needs Blender 4.2+ (the install is refused without it) and Bambu Studio.",
+  "description": "Idea, photo or shop listing to a sliced project for ElegooSlicer (Elegoo Centauri Carbon or Centauri Carbon 2) or Bambu Studio (Bambu Lab X2D), with a 3D view of the part to rotate. Needs Blender 4.2+ (the install is refused without it) and ElegooSlicer or Bambu Studio. Runs on Windows, macOS and Linux.",
   "author": { "name": "mfranzon" },
   "homepage": "https://github.com/mfranzon/print3d",
   "repository": "https://github.com/mfranzon/print3d",

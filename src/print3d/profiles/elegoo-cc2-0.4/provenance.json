@@ -1,0 +1,15 @@
+{
+  "profiles_root": "C:\\Program Files\\ElegooSlicer\\resources\\profiles",
+  "machine": "Elegoo Centauri Carbon 2 0.4 nozzle",
+  "process": "0.20mm Standard @Elegoo CC2 0.4 nozzle",
+  "filaments": [
+    "Elegoo PLA @ECC2"
+  ],
+  "bed_type": "Textured PEI Plate",
+  "cli_overlay_applied": false,
+  "machine_keys": 94,
+  "process_keys": 145,
+  "filament_keys": [
+    62
+  ]
+}

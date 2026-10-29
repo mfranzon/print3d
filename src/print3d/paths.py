@@ -16,6 +16,22 @@ def repo_root() -> Path:
 
 
 def default_profiles_dir() -> Path:
+    """`PRINT3D_PROFILES`, else the pinned profile set for `PRINT3D_PRINTER`.
+
+    PRINT3D_PRINTER picks the printer: `cc` (Elegoo Centauri Carbon, the
+    default), `cc2` (Centauri Carbon 2) or `x2d` (Bambu Lab X2D).
+    """
+    if env := os.environ.get("PRINT3D_PROFILES", "").strip():
+        return Path(env).expanduser()
+    preset = os.environ.get("PRINT3D_PRINTER", "cc").strip().lower()
+    chosen = {
+        "cc": "elegoo-cc-0.4",
+        "cc2": "elegoo-cc2-0.4",
+        "x2d": "x2d-0.4",
+    }.get(preset, "elegoo-cc-0.4")
+    chosen_dir = PACKAGE / "profiles" / chosen
+    if chosen_dir.is_dir():
+        return chosen_dir
     return PACKAGE / "profiles" / "x2d-0.4"
 
 

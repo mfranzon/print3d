@@ -1,0 +1,12 @@
+{
+  "preset": "elegoo-cc2",
+  "slicer": "elegoo",
+  "printer": "Elegoo Centauri Carbon 2 (0.4 mm)",
+  "machine": "Elegoo Centauri Carbon 2 0.4 nozzle",
+  "process": "0.20mm Standard @Elegoo CC2 0.4 nozzle",
+  "filaments": [
+    "Elegoo PLA @ECC2"
+  ],
+  "bed_type": "Textured PEI Plate",
+  "nozzles": 1
+}

@@ -37,3 +37,12 @@ def blender_locations() -> Iterator[Path]:
 def studio_locations() -> Iterator[Path]:
     for root in program_files_dirs():
         yield root / "Bambu Studio" / "bambu-studio.exe"
+
+
+def elegoo_locations() -> Iterator[Path]:
+    for root in program_files_dirs():
+        yield root / "ElegooSlicer" / "elegoo-slicer.exe"
+    # Some builds install without the space or under the local programs tree.
+    local = os.environ.get("LOCALAPPDATA", "").strip()
+    if local:
+        yield Path(local) / "Programs" / "ElegooSlicer" / "elegoo-slicer.exe"

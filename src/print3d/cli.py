@@ -6,6 +6,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 from print3d.blender import BlenderError, find_blender, run_model_script
 from print3d.brief import parse_brief
@@ -13,7 +14,6 @@ from print3d import setup as installer
 from print3d import spec as specs
 from print3d.dfm import check_mesh
 from print3d.fits import KINDS, load_fits, save_fits
-from print3d.flatten import flatten_x2d
 from print3d.handoff import build_handoff
 from print3d.likeness import check_job
 from print3d.paths import coupon_script, default_profiles_dir, job_path, safe_name
@@ -21,7 +21,7 @@ from print3d.photo import grid, meet
 from print3d.pipeline import _model_params, run_job
 from print3d.printability import advise, analyze_mesh, analyze_slice, dfm_advice, worst_severity
 from print3d.project import inspect_project
-from print3d.studio import SliceRequest, find_studio, slice_plan
+from print3d.studio import SliceRequest, find_slicer, slice_plan, slicer_name
 from print3d.viewer import build_viewer
 
 
@@ -225,7 +225,27 @@ def cmd_setup(args: argparse.Namespace) -> int:
 
 
 def cmd_flatten(args: argparse.Namespace) -> int:
-    _print_json(flatten_x2d(output_dir=Path(args.output) if args.output else default_profiles_dir()))
+    from print3d.flatten import PRESETS, FlattenError, flatten_printer
+
+    kwargs: dict[str, Any] = {}
+    if args.machine:
+        kwargs["machine_leaf"] = args.machine
+    if args.process:
+        kwargs["process_leaf"] = args.process
+    if args.filament:
+        kwargs["filament_leaves"] = args.filament
+    if args.bed_type:
+        kwargs["bed_type"] = args.bed_type
+    if args.profiles_root:
+        kwargs["profiles_root"] = Path(args.profiles_root)
+    try:
+        _print_json(
+            flatten_printer(preset=args.printer, output_dir=Path(args.output) if args.output else default_profiles_dir(), **kwargs)
+        )
+    except FlattenError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        print(f"presets: {', '.join(PRESETS)}", file=sys.stderr)
+        return 1
     return 0
 
 
@@ -235,16 +255,22 @@ def cmd_status(_args: argparse.Namespace) -> int:
         blender = str(find_blender())
     except BlenderError as exc:
         blender = f"missing: {exc}"
+    try:
+        slicer = str(find_slicer())
+    except Exception as exc:  # noqa: BLE001
+        slicer = f"missing: {exc}"
+    pin = profiles / "pin.json"
     _print_json(
         {
             "blender": blender,
-            "studio": str(find_studio()),
+            "slicer": slicer,
+            "printer": (json.loads(pin.read_text(encoding="utf-8")).get("printer") if pin.is_file() else None),
             "profiles": str(profiles),
             "profiles_present": all(
                 (profiles / name).is_file()
                 for name in ("machine.json", "process.json", "filament.json")
             ),
-            "stops_at": "review in Bambu Studio",
+            "stops_at": f"review in {slicer_name(Path(slicer)) if not slicer.startswith('missing') else 'the slicer'}",
         }
     )
     return 0
@@ -398,7 +424,14 @@ def build_parser() -> argparse.ArgumentParser:
     setup_cmd.add_argument("--yes", action="store_true", help="Apply without asking")
     setup_cmd.set_defaults(func=cmd_setup)
 
-    flatten_cmd = sub.add_parser("flatten", help="Rebuild pinned X2D Studio profiles")
+    flatten_cmd = sub.add_parser("flatten", help="Flatten slicer profiles into a pinned printer set")
+    flatten_cmd.add_argument("--printer", default="elegoo-cc",
+                             help="Preset: elegoo-cc (default), elegoo-cc2 or x2d")
+    flatten_cmd.add_argument("--machine", help="Machine profile leaf name (default: the preset's)")
+    flatten_cmd.add_argument("--process", help="Process profile leaf name (default: the preset's)")
+    flatten_cmd.add_argument("--filament", action="append", help="Filament leaf (repeatable; default: the preset's)")
+    flatten_cmd.add_argument("--bed-type", help="Bed type name passed to --curr-bed-type")
+    flatten_cmd.add_argument("--profiles-root", help="Vendor profiles dir (default: the installed slicer's)")
     flatten_cmd.add_argument("--output")
     flatten_cmd.set_defaults(func=cmd_flatten)
 

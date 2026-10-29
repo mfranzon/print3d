@@ -2,10 +2,11 @@
 
 A [Hermes Agent](https://github.com/NousResearch/hermes-agent) plugin that turns
 an idea, a photo of an object, or the shop listing of something you would
-otherwise buy into a Bambu Studio project for a **Bambu Lab X2D (0.4 mm
-nozzle)**. One part or several, in one colour or two, with fits measured against
-your own printer, a 3D view to turn the result around in, and a print sheet to
-hand on. It also works with Claude Code, Codex, Cursor and Gemini CLI.
+otherwise buy into a sliced print project for an **Elegoo Centauri Carbon or
+Centauri Carbon 2 (via ElegooSlicer)** or a **Bambu Lab X2D (0.4 mm nozzle, via
+Bambu Studio)**. One part or several, in one colour or two, with fits measured
+against your own printer, a 3D view to turn the result around in, and a print
+sheet to hand on. It also works with Claude Code, Codex, Cursor and Gemini CLI.
 
 ![From a museum photo of a wooden peg to a sliced, printable model, in eight steps](docs/workflow.gif)
 
@@ -15,12 +16,12 @@ measured with evidence, modelled, checked against the photo, sliced.
 [the benchmark](#benchmark-a-clothes-peg-from-a-museum-photo).*
 
 The agent writes a Blender script that builds the part. print3d runs it, checks
-the mesh, slices it with Bambu Studio, and tells the agent what to fix. The
-agent repeats until every check passes, then hands you the `.3mf` to open in
-Studio and print from there.
+the mesh, slices it with ElegooSlicer (or Bambu Studio), and tells the agent
+what to fix. The agent repeats until every check passes, then hands you the
+`.3mf` to open in the slicer and print from there.
 
 ```
-idea -> Blender script -> mesh -> checks -> slice -> .3mf -> you print from Studio
+idea -> Blender script -> mesh -> checks -> slice -> .3mf -> you print from the slicer
              ^                      |
              +---- fix the script --+
 ```
@@ -30,6 +31,7 @@ Nothing here talks to the printer.
 ## Install in Hermes
 
 You need [Blender](https://www.blender.org/download/) 4.2+,
+[ElegooSlicer](https://www.elegoo.com/pages/elegoo-slicer) or
 [Bambu Studio](https://bambulab.com/en/download/studio) and
 [uv](https://docs.astral.sh/uv/) on the same machine as Hermes. Then:
 
@@ -53,13 +55,20 @@ itself, so there is no Hermes config to edit.
 Start a new session afterwards. `hermes plugins update print3d` updates both;
 `hermes plugins remove print3d` removes both.
 
-Explicit `BLENDER_BIN` and `BAMBU_STUDIO_BIN` paths take precedence, followed by
-executables on `PATH`. On macOS, Blender and Studio are also found in
-`/Applications`. On Windows, print3d checks the Program Files directories for
-`Blender Foundation/Blender <version>/blender.exe` and
-`Bambu Studio/bambu-studio.exe`, preferring newer Blender version folders within
-each directory. Custom and portable installations can use the environment
-variables above. Jobs go to `~/print3d/jobs`, or `$PRINT3D_JOBS`.
+Explicit `BLENDER_BIN`, `ELEGOO_SLICER_BIN` and `BAMBU_STUDIO_BIN` paths take
+precedence, followed by executables on `PATH`. On macOS, Blender and the
+slicers are also found in `/Applications`. On Windows, print3d checks the
+Program Files directories for `Blender Foundation/Blender <version>/blender.exe`,
+`ElegooSlicer/elegoo-slicer.exe` and `Bambu Studio/bambu-studio.exe`, preferring
+newer Blender version folders within each directory. Custom and portable
+installations can use the environment variables above. Jobs go to
+`~/print3d/jobs`, or `$PRINT3D_JOBS`.
+
+The pinned profiles live in `src/print3d/profiles/`: `elegoo-cc-0.4` (Elegoo
+Centauri Carbon), `elegoo-cc2-0.4` (Centauri Carbon 2) and `x2d-0.4` (Bambu Lab
+X2D). `$PRINT3D_PRINTER` picks between them (`cc`, `cc2` or `x2d`; default
+`cc`), and `python -m print3d flatten --printer <preset>` rebuilds a set from
+the installed slicer's own vendor profiles.
 
 Hermes looks for Blender 4.2+ before it installs the plugin, and refuses the
 install when there is none. It checks the usual places: `/Applications` and
@@ -172,7 +181,7 @@ fill in and run again.
 | `fit show` / `fit set` | The clearance per fit that scripts get as `params["fit"]`, and recording yours |
 | `plan model.stl out.gcode.3mf` | Show the Studio command without running it |
 | `status` | Where Blender and Studio were found |
-| `flatten` | Rebuild the X2D presets in `src/print3d/profiles/x2d-0.4/` |
+| `flatten` | Rebuild the pinned printer presets in `src/print3d/profiles/` (`--printer elegoo-cc`, `elegoo-cc2` or `x2d`) |
 | `setup` | Register print3d with your agents |
 | `mcp` | Run the MCP server on stdio (agents launch this) |
 

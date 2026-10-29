@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from print3d.dfm import DfmReport, read_stl
-from print3d.project import read_plate_gcode
+from print3d.project import read_plate_gcode, slice_info_weight_g
 
 # Slope measured from the horizontal plane: 0 deg is a flat ceiling, 90 deg a
 # vertical wall. The classic 45 deg rule is the default.
@@ -41,6 +41,9 @@ LAYER_GROWTH_WARN = 2.0
 MOVE_RE = re.compile(r"^G[0-3]\b(.*)$")
 AXIS_RE = re.compile(r"([XYZEF])(-?\d*\.?\d+)")
 TIME_RE = re.compile(r"total estimated time:\s*(.+?)\s*$", re.IGNORECASE)
+ORCA_TIME_RE = re.compile(
+    r";?\s*estimated printing time \((?:normal|quiet) mode\)\s*=\s*(.+?)\s*$", re.IGNORECASE
+)
 WEIGHT_RE = re.compile(r"total filament weight \[g\]\s*[:=]\s*([0-9.]+)", re.IGNORECASE)
 LAYERS_RE = re.compile(r"total layer number:\s*(\d+)", re.IGNORECASE)
 
@@ -143,28 +146,48 @@ def analyze_mesh(path: Path, *, slope_deg: float = OVERHANG_SLOPE_DEG) -> dict[s
 def analyze_slice(project: Path, plate: int = 1) -> dict[str, Any]:
     """Per-layer material from the gcode. No feature comments needed."""
     gcode = read_plate_gcode(project, plate)
-    header, _, body = gcode.partition("CONFIG_BLOCK_END")
-
+    # Bambu Studio writes the settings block at the top, ending at
+    # CONFIG_BLOCK_END. ElegooSlicer (Orca lineage) writes the same block at
+    # the bottom, after the gcode, so the moves and summary lines sit before
+    # CONFIG_BLOCK_START. Either way the block holds only comments, so one
+    # pass over all lines - skipping the block itself - collects both the
+    # summary and the moves without a second scan.
     estimated_time = None
     weight_g = None
     layer_count = None
-    for line in header.splitlines():
-        if match := TIME_RE.search(line):
-            estimated_time = match.group(1).rstrip(";").strip()
-        if match := WEIGHT_RE.search(line):
-            weight_g = float(match.group(1))
-        if match := LAYERS_RE.search(line):
-            layer_count = int(match.group(1))
-
-    # Z-hops and travel moves revisit a height many times, so bin extrusion by Z
-    # rather than starting a layer on every Z change.
     relative_e = True
     current_z = 0.0
     last_e = 0.0
     by_z: dict[float, float] = {}
+    in_block = False
 
-    for line in body.splitlines():
-        stripped = line.strip()
+    for raw in gcode.splitlines():
+        stripped = raw.strip()
+        if not stripped:
+            continue
+        first = stripped[0]
+        if "CONFIG_BLOCK_START" in stripped:
+            in_block = True
+            continue
+        if "CONFIG_BLOCK_END" in stripped:
+            in_block = False
+            continue
+        if in_block:
+            continue
+        if first == ";":
+            if estimated_time is None:
+                match = TIME_RE.search(stripped) or ORCA_TIME_RE.search(stripped)
+                if match:
+                    estimated_time = match.group(1).rstrip(";").strip()
+            if weight_g is None:
+                match = WEIGHT_RE.search(stripped)
+                if match:
+                    weight_g = float(match.group(1))
+            if layer_count is None:
+                match = LAYERS_RE.search(stripped)
+                if match:
+                    layer_count = int(match.group(1))
+            continue
         if stripped.startswith("M83"):
             relative_e = True
             continue
@@ -197,6 +220,10 @@ def analyze_slice(project: Path, plate: int = 1) -> dict[str, Any]:
         if previous > 0.5 and amounts[index] / previous > growth:
             growth = amounts[index] / previous
             growth_z = layers[index]["z"]
+
+    if weight_g is None:
+        # Orca-lineage slicers put the weight in slice_info, not the gcode header.
+        weight_g = slice_info_weight_g(project, plate)
 
     return {
         "plate": plate,

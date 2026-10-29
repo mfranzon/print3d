@@ -21,6 +21,41 @@ DEFAULT_PROCESS = "0.20mm Standard @BBL X2D"
 DEFAULT_FILAMENT = "Bambu PLA Basic @BBL X2D 0.4 nozzle"
 DEFAULT_BED_TYPE = "Textured PEI Plate"
 
+# Pinned printer presets: which vendor profile tree to flatten, which leaves,
+# which bed the prints land on, and how many nozzles the printer has.
+PRESETS: dict[str, dict[str, Any]] = {
+    "x2d": {
+        "slicer": "bambu",
+        "vendor": "BBL",
+        "printer": "Bambu Lab X2D (0.4 mm)",
+        "machine": DEFAULT_MACHINE,
+        "process": DEFAULT_PROCESS,
+        "filaments": [DEFAULT_FILAMENT],
+        "bed_type": DEFAULT_BED_TYPE,
+        "nozzles": 2,
+    },
+    "elegoo-cc": {
+        "slicer": "elegoo",
+        "vendor": "Elegoo",
+        "printer": "Elegoo Centauri Carbon (0.4 mm)",
+        "machine": "Elegoo Centauri Carbon 0.4 nozzle",
+        "process": "0.20mm Standard @Elegoo CC 0.4 nozzle",
+        "filaments": ["Elegoo PLA @ECC"],
+        "bed_type": "Textured PEI Plate",
+        "nozzles": 1,
+    },
+    "elegoo-cc2": {
+        "slicer": "elegoo",
+        "vendor": "Elegoo",
+        "printer": "Elegoo Centauri Carbon 2 (0.4 mm)",
+        "machine": "Elegoo Centauri Carbon 2 0.4 nozzle",
+        "process": "0.20mm Standard @Elegoo CC2 0.4 nozzle",
+        "filaments": ["Elegoo PLA @ECC2"],
+        "bed_type": "Textured PEI Plate",
+        "nozzles": 1,
+    },
+}
+
 
 class FlattenError(RuntimeError):
     """Raised when a profile tree cannot be flattened."""
@@ -28,19 +63,35 @@ class FlattenError(RuntimeError):
 
 def detect_profiles_root(slicer_path: str | None = None) -> Path:
     candidates: list[Path] = []
-    env_root = os.environ.get("BAMBU_PROFILES_ROOT", "").strip()
-    if env_root:
-        candidates.append(Path(env_root).expanduser())
+    for variable in ("ELEGOO_PROFILES_ROOT", "BAMBU_PROFILES_ROOT"):
+        env_root = os.environ.get(variable, "").strip()
+        if env_root:
+            candidates.append(Path(env_root).expanduser())
+    candidates.append(Path.home() / "Library/Application Support/ElegooSlicer/system")
     candidates.append(Path.home() / "Library/Application Support/BambuStudio/system")
     if slicer_path:
         slicer = Path(slicer_path).resolve()
+        # Windows: <install>/resources/profiles; macOS: <app>/Contents/Resources/profiles.
+        for relative in ("resources", "Resources"):
+            candidates.append(slicer.parent / relative / "profiles")
         candidates.append(slicer.parent.parent / "Resources" / "profiles")
+    candidates.append(Path("/Applications/ElegooSlicer.app/Contents/Resources/profiles"))
     candidates.append(Path("/Applications/BambuStudio.app/Contents/Resources/profiles"))
+    from print3d.windows import program_files_dirs
+
+    for root in program_files_dirs():
+        for relative in (
+            "ElegooSlicer/resources/profiles",
+            "ElegooSlicer/Resources/profiles",
+            "Bambu Studio/Resources/profiles",
+        ):
+            candidates.append(root / relative)
     for candidate in candidates:
-        if (candidate / "BBL" / "machine").is_dir():
+        if (candidate / "Elegoo" / "machine").is_dir() or (candidate / "BBL" / "machine").is_dir():
             return candidate
     raise FlattenError(
-        "Could not find Bambu Lab profiles. Set BAMBU_PROFILES_ROOT or install Bambu Studio."
+        "Could not find slicer profiles. Install ElegooSlicer or Bambu Studio, "
+        "or set ELEGOO_PROFILES_ROOT."
     )
 
 
@@ -57,7 +108,9 @@ def build_name_index(profiles_root: Path, vendor: str = "BBL") -> dict[str, dict
         directory = profiles_root / vendor / kind
         if not directory.is_dir():
             continue
-        for path in directory.glob("*.json"):
+        # ElegooSlicer nests filament profiles per printer (filament/ECC/...),
+        # so walk the whole subtree.
+        for path in sorted(directory.rglob("*.json")):
             try:
                 data = load_json(path)
             except (OSError, json.JSONDecodeError, FlattenError):
@@ -216,33 +269,61 @@ def _home_relative(path: Path) -> str:
         return str(path)
 
 
+def load_pin(profiles_dir: Path) -> dict[str, Any]:
+    """What a pinned profile set means. Profile sets from before pin.json are X2D."""
+    path = profiles_dir / "pin.json"
+    if path.is_file():
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, dict) and data.get("slicer"):
+            return data
+    return {
+        "preset": "x2d",
+        "slicer": "bambu",
+        "printer": "Bambu Lab X2D (0.4 mm)",
+        "machine": DEFAULT_MACHINE,
+        "process": DEFAULT_PROCESS,
+        "filaments": [DEFAULT_FILAMENT],
+        "bed_type": DEFAULT_BED_TYPE,
+        "nozzles": 2,
+    }
+
+
 def write_profile(path: Path, data: dict[str, Any]) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     return path
 
 
-def flatten_x2d(
+def flatten_printer(
     *,
+    preset: str = "x2d",
     profiles_root: Path | None = None,
     output_dir: Path,
-    machine_leaf: str = DEFAULT_MACHINE,
-    process_leaf: str = DEFAULT_PROCESS,
+    machine_leaf: str | None = None,
+    process_leaf: str | None = None,
     filament_leaves: Iterable[str] | None = None,
-    bed_type: str = DEFAULT_BED_TYPE,
+    bed_type: str | None = None,
     nozzle_volume_type: str | None = None,
     slicer_path: str | None = None,
 ) -> dict[str, Any]:
+    if preset not in PRESETS:
+        raise FlattenError(f"Unknown printer preset {preset!r}; choose from {', '.join(PRESETS)}.")
+    pinned = PRESETS[preset]
+    vendor: str = pinned["vendor"]
+    machine_leaf = machine_leaf or str(pinned["machine"])
+    process_leaf = process_leaf or str(pinned["process"])
+    bed_type = bed_type or str(pinned["bed_type"])
+    filaments = list(filament_leaves or pinned["filaments"])
+
     root = profiles_root or detect_profiles_root(slicer_path)
-    filaments = list(filament_leaves or [DEFAULT_FILAMENT])
-    index = build_name_index(root)
+    index = build_name_index(root, vendor=vendor)
     machine = flatten_by_name(machine_leaf, index)
     process = flatten_by_name(process_leaf, index)
     filament_profiles = [flatten_by_name(name, index) for name in filaments]
 
     derive_nozzle_volume_type(machine, nozzle_volume_type)
     apply_machine_model_bed_metadata(machine, index)
-    overlay = apply_cli_overlay(machine, root)
+    overlay = apply_cli_overlay(machine, root, vendor=vendor)
 
     normalize_for_cli(machine, "machine", machine_leaf)
     normalize_for_cli(process, "process", process_leaf)
@@ -259,6 +340,18 @@ def flatten_x2d(
     for index_, filament in enumerate(filament_profiles):
         name = "filament.json" if len(filament_profiles) == 1 else f"filament-{index_}.json"
         filament_paths.append(write_profile(output_dir / name, filament))
+
+    pin = {
+        "preset": preset,
+        "slicer": pinned["slicer"],
+        "printer": pinned["printer"],
+        "machine": machine_leaf,
+        "process": process_leaf,
+        "filaments": filaments,
+        "bed_type": bed_type,
+        "nozzles": pinned["nozzles"],
+    }
+    (output_dir / "pin.json").write_text(json.dumps(pin, indent=2) + "\n", encoding="utf-8")
 
     provenance = {
         "profiles_root": _home_relative(root),
@@ -278,5 +371,31 @@ def flatten_x2d(
         "machine_path": str(machine_path),
         "process_path": str(process_path),
         "filament_paths": [str(path) for path in filament_paths],
+        "pin": pin,
         "provenance": provenance,
     }
+
+
+def flatten_x2d(
+    *,
+    profiles_root: Path | None = None,
+    output_dir: Path,
+    machine_leaf: str = DEFAULT_MACHINE,
+    process_leaf: str = DEFAULT_PROCESS,
+    filament_leaves: Iterable[str] | None = None,
+    bed_type: str = DEFAULT_BED_TYPE,
+    nozzle_volume_type: str | None = None,
+    slicer_path: str | None = None,
+) -> dict[str, Any]:
+    """Back-compat wrapper: the pinned X2D profile set."""
+    return flatten_printer(
+        preset="x2d",
+        profiles_root=profiles_root,
+        output_dir=output_dir,
+        machine_leaf=machine_leaf,
+        process_leaf=process_leaf,
+        filament_leaves=filament_leaves,
+        bed_type=bed_type,
+        nozzle_volume_type=nozzle_volume_type,
+        slicer_path=slicer_path,
+    )

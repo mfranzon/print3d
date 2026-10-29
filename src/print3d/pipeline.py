@@ -19,8 +19,9 @@ from typing import Any
 from print3d.blender import BlenderError, run_model_script, scaffold_script
 from print3d.brief import PrintBrief, parse_brief
 from print3d.dfm import check_mesh, require_printable
-from print3d.filaments import DEFAULT_COLOUR, NOZZLES, colour_hex, job_filaments
+from print3d.filaments import DEFAULT_COLOUR, colour_hex, job_filaments
 from print3d.fits import fit_advice, load_fits
+from print3d.flatten import load_pin
 from print3d.likeness import check_likeness, likeness_advice
 from print3d.paths import default_jobs_dir, default_profiles_dir
 from print3d.printability import (
@@ -138,6 +139,9 @@ def _run_job(
             raise PipelineError(
                 f"Pinned profile missing: {profiles / required}. Run: python -m print3d flatten"
             )
+    pin = load_pin(profiles)
+    slicer = "ElegooSlicer" if pin["slicer"] == "elegoo" else "Bambu Studio"
+    report["printer"] = pin.get("printer", pin.get("machine"))
 
     fits = load_fits()
     spec = load_spec(job_dir)
@@ -192,6 +196,7 @@ def _run_job(
         ),
         datadir=job_dir / "studio-datadir",
         output_dir=job_dir / "slice",
+        bed_type=pin["bed_type"],
         # Auto-orient would silently rotate the part and invalidate every
         # overhang note below. Orientation is the model script's business.
         orient=False,
@@ -234,7 +239,7 @@ def _run_job(
             "next_step": (
                 "Fix the errors in the model script and run again."
                 if severity == "error"
-                else "Open the .3mf in Bambu Studio, check the preview, and print it from there."
+                else f"Open the .3mf in {slicer}, check the preview, and print it from there."
             ),
         }
     )
@@ -268,6 +273,8 @@ def _run_parts(
     execute: bool,
 ) -> dict[str, Any]:
     """Several printed parts: a check per printed object, fits between them, one slice for all."""
+    pin = load_pin(profiles)
+    slicer = "ElegooSlicer" if pin["slicer"] == "elegoo" else "Bambu Studio"
     model = report["model"]
     parts = {part["name"]: part for part in model["parts"]}
 
@@ -313,14 +320,14 @@ def _run_parts(
         )
     if errors:
         raise PipelineError("; ".join(errors))
-    if len(colours) > NOZZLES:
+    if len(colours) > pin["nozzles"]:
         notes.append(
             Advice(
                 "colours",
                 "note",
-                f"{len(colours)} colours on {NOZZLES} nozzles: Studio swaps filament within a nozzle, "
-                "purging at every change.",
-                "Fine with an AMS; otherwise keep to two colours per plate.",
+                f"{len(colours)} colours on {pin['nozzles']} nozzles: the slicer swaps filament "
+                "within a nozzle, purging at every change.",
+                "Fine with a multi-material system; otherwise keep to one colour per nozzle per plate.",
             )
         )
     report["mesh_metrics"] = metrics
@@ -372,6 +379,7 @@ def _run_parts(
         filaments=tuple(filaments),
         datadir=job_dir / "studio-datadir",
         output_dir=slice_dir,
+        bed_type=pin["bed_type"],
         orient=False,
         assemble_list=assemble,
     )
@@ -438,7 +446,7 @@ def _run_parts(
             "next_step": (
                 "Fix the errors in the model script and run again."
                 if severity == "error"
-                else "Open the .3mf in Bambu Studio, check each plate, and print from there."
+                else f"Open the .3mf in {slicer}, check each plate, and print from there."
             ),
         }
     )
