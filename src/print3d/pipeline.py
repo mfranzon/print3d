@@ -37,7 +37,7 @@ from print3d.printability import (
 )
 from print3d.project import extract_plate_png, inspect_project
 from print3d.spec import load_spec, model_dims
-from print3d.studio import SliceRequest, assemble_list, run_slice, slice_plan
+from print3d.studio import SliceRequest, assemble_list, find_studio, run_slice, slice_plan
 from print3d.viewer import build_viewer
 
 MODEL_SCRIPT = "model.py"
@@ -156,9 +156,17 @@ def _run_job(
         mesh_path = mesh.expanduser().resolve()
         if not mesh_path.is_file():
             raise PipelineError(f"Mesh does not exist: {mesh_path}")
-        report["model"] = {"mesh": str(mesh_path), "source": "supplied"}
     else:
         model_script = _resolve_script(brief, job_dir, script)
+
+    # Keep scaffolding and dry runs usable without Studio. For a real run,
+    # fail inside the report lifecycle before Blender can overwrite geometry.
+    if execute:
+        find_studio()
+
+    if mesh is not None:
+        report["model"] = {"mesh": str(mesh_path), "source": "supplied"}
+    else:
         mesh_path = job_dir / "mesh" / f"{brief.slug}.stl"
         try:
             report["model"] = run_model_script(

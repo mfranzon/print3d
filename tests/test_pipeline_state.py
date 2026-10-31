@@ -55,12 +55,41 @@ def job(tmp_path, monkeypatch, request):
 
     monkeypatch.setattr(pipeline, "run_model_script", model)
     monkeypatch.setattr(pipeline, "run_slice", slice_)
+    monkeypatch.setattr(pipeline, "find_studio", lambda: Path("fixture-studio"))
 
     def run(**kwargs):
         return pipeline.run_job("state test cube", script=script, jobs_dir=tmp_path / "jobs", **kwargs)
 
     assert run()["status"] == "ready_for_review"
     return job_dir, state, run
+
+
+def test_missing_studio_stops_before_modelling_and_blocks_old_handoff(job, monkeypatch):
+    job_dir, state, run = job
+    previous_mesh = next((job_dir / "mesh").glob("*.stl")).read_bytes()
+    delivery = build_handoff(job_dir, render=False)
+    sheet = Path(delivery["sheet"])
+    previous_sheet = sheet.read_bytes()
+    state["status_at_model_start"] = None
+
+    def missing():
+        raise StudioError("Set BAMBU_STUDIO_BIN")
+
+    monkeypatch.setattr(pipeline, "find_studio", missing)
+    with pytest.raises(StudioError, match="BAMBU_STUDIO_BIN"):
+        run()
+    assert state["status_at_model_start"] is None
+    assert next((job_dir / "mesh").glob("*.stl")).read_bytes() == previous_mesh
+    assert json.loads((job_dir / "report.json").read_text())["status"] == "failed"
+    with pytest.raises(HandoffError):
+        build_handoff(job_dir, render=False)
+    assert sheet.read_bytes() == previous_sheet
+
+
+def test_dry_run_does_not_require_studio(job, monkeypatch):
+    _, _, run = job
+    monkeypatch.setattr(pipeline, "find_studio", lambda: pytest.fail("dry run probed Studio"))
+    assert run(execute=False)["status"] == "dry_run"
 
 
 def test_dry_run_blocks_handoff_until_a_successful_slice(job):

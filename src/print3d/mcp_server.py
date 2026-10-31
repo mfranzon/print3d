@@ -19,6 +19,7 @@ from mcp.types import ToolAnnotations
 from print3d import printers
 from print3d import spec as specs
 from print3d.dfm import check_mesh
+from print3d.doctor import dependency_status
 from print3d.fits import load_fits, save_fits
 from print3d.handoff import build_handoff
 from print3d.likeness import check_job
@@ -37,7 +38,9 @@ checks the mesh against that printer, slices it and returns advice, each note wi
 the fix to apply to the script. Iterate until no note is at `error`, then hand the
 user the .3mf path and name the printer in the report's `printer`.
 
-Read guide("workflow") before the first run. From a photo of an object, also read
+Call `doctor` before writing a model for a new job; resolve missing or unavailable
+dependencies first. Read guide("workflow") before the first run. From a photo of
+an object, also read
 guide("from-photo"): it records every dimension with its evidence and adds a
 likeness check against the photo. To replace something sold in a shop, read
 guide("from-listing"): the listing's stated sizes and product photos stand in for
@@ -90,6 +93,18 @@ def _saved(slug: str, spec: dict[str, Any], entry: Any) -> str:
 
 def _with_images(payload: dict[str, Any], paths: list[str | None]) -> list[Any]:
     return [_json(payload), *(Image(path=p) for p in paths if p and Path(p).is_file())]
+
+
+@tool(read_only=True)
+def doctor() -> str:
+    """Check Blender and Bambu Studio paths, availability and versions before writing a model.
+
+    Studio is ready when found; version detection never blocks readiness.
+    Windows/macOS read metadata without launching Studio; Linux probes --help.
+    Blender must pass --version. Unknown versions are reported as null.
+    Does not create jobs or change agent settings.
+    """
+    return _json(dependency_status())
 
 
 @tool(read_only=True)

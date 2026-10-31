@@ -7,12 +7,13 @@ import json
 import sys
 from pathlib import Path
 
-from print3d.blender import BlenderError, find_blender, run_model_script
+from print3d.blender import run_model_script
 from print3d.brief import parse_brief
 from print3d import printers
 from print3d import setup as installer
 from print3d import spec as specs
 from print3d.dfm import check_mesh
+from print3d.doctor import dependency_status, discover_dependencies
 from print3d.fits import KINDS, load_fits, save_fits
 from print3d.flatten import flatten_printer
 from print3d.handoff import build_handoff
@@ -22,7 +23,7 @@ from print3d.photo import grid, meet
 from print3d.pipeline import _model_params, run_job
 from print3d.printability import advise, analyze_mesh, analyze_slice, dfm_advice, worst_severity
 from print3d.project import inspect_project
-from print3d.studio import SliceRequest, find_studio, slice_plan
+from print3d.studio import SliceRequest, slice_plan
 from print3d.viewer import build_viewer
 
 
@@ -237,17 +238,21 @@ def cmd_printer(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_doctor(_args: argparse.Namespace) -> int:
+    report = dependency_status()
+    _print_json(report)
+    return 0 if report["ready"] else 1
+
+
 def cmd_status(_args: argparse.Namespace) -> int:
     profiles = default_profiles_dir()
-    try:
-        blender = str(find_blender())
-    except BlenderError as exc:
-        blender = f"missing: {exc}"
+    dependencies = discover_dependencies()
+    paths = {name: check["path"] or f"missing: {check['message']}"
+             for name, check in dependencies.items()}
     choice = printers.printer_choice()
     _print_json(
         {
-            "blender": blender,
-            "studio": str(find_studio()),
+            **paths,
             "printer": {**choice, "summary": printers.printer_info(choice["printer"]).describe()},
             "profiles": str(profiles),
             "profiles_present": all(
@@ -420,6 +425,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     status_cmd = sub.add_parser("status", help="Show Blender, slicer and profile paths")
     status_cmd.set_defaults(func=cmd_status)
+
+    doctor_cmd = sub.add_parser("doctor", help="Check Blender and Bambu Studio before starting a job")
+    doctor_cmd.set_defaults(func=cmd_doctor)
 
     plan_cmd = sub.add_parser("plan", help="Print the Studio command without running it")
     plan_cmd.add_argument("mesh")

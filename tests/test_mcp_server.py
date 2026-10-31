@@ -105,4 +105,4 @@ def test_only_read_tools_skip_the_prompt():
             return {t.name for t in (await client.list_tools()).tools
                     if t.annotations and t.annotations.read_only_hint}
 
-    assert anyio.run(hints) == {"guide", "show_spec", "meet", "grid", "check", "likeness", "view"}
+    assert anyio.run(hints) == {"guide", "doctor", "show_spec", "meet", "grid", "check", "likeness", "view"}
