@@ -37,3 +37,10 @@ def blender_locations() -> Iterator[Path]:
 def studio_locations() -> Iterator[Path]:
     for root in program_files_dirs():
         yield root / "Bambu Studio" / "bambu-studio.exe"
+
+
+def studio_profiles_locations() -> Iterator[Path]:
+    # The Windows install keeps the profile tree beside the executable, where
+    # the macOS bundle has it one level up in Contents/Resources.
+    for root in program_files_dirs():
+        yield root / "Bambu Studio" / "resources" / "profiles"

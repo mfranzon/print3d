@@ -3,14 +3,14 @@ from types import SimpleNamespace
 
 import pytest
 
-from print3d import blender, studio, windows
+from print3d import blender, flatten, studio, windows
 
 
 @pytest.fixture
 def windows_env(tmp_path, monkeypatch):
     monkeypatch.setattr(windows, "sys", SimpleNamespace(platform="win32"))
     for name in ("ProgramW6432", "ProgramFiles", "ProgramFiles(x86)",
-                 "BLENDER_BIN", "BAMBU_STUDIO_BIN"):
+                 "BLENDER_BIN", "BAMBU_STUDIO_BIN", "BAMBU_PROFILES_ROOT"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(blender, "BLENDER_LOCATIONS", ())
     monkeypatch.setattr(blender.shutil, "which", lambda *a, **kw: None)
@@ -108,3 +108,24 @@ def test_unset_program_files_does_not_search_current_directory(
     monkeypatch.setattr(Path, "is_file", lambda path: path.is_relative_to(tmp_path))
     with pytest.raises(error, match=env):
         find(search_path="")
+
+
+def only_profile_tree(root: Path, monkeypatch) -> Path:
+    (root / "BBL" / "machine").mkdir(parents=True)
+    # Exclude an actual profile tree on the machine running the test.
+    is_dir = Path.is_dir
+    monkeypatch.setattr(Path, "is_dir", lambda path: path.is_relative_to(root) and is_dir(path))
+    return root
+
+
+def test_finds_the_studio_profile_tree_in_program_files(windows_env, monkeypatch):
+    """Nothing passes flatten a slicer path, so Program Files is all it has to go on."""
+    expected = only_profile_tree(windows_env / "Bambu Studio" / "resources" / "profiles", monkeypatch)
+    assert flatten.detect_profiles_root() == expected
+
+
+def test_a_windows_slicer_sits_beside_its_profiles(windows_env, monkeypatch):
+    """The macOS bundle keeps them one level up, in Contents/Resources."""
+    slicer = executable(windows_env / "Bambu Studio" / "bambu-studio.exe")
+    expected = only_profile_tree(slicer.parent / "resources" / "profiles", monkeypatch)
+    assert flatten.detect_profiles_root(str(slicer)) == expected

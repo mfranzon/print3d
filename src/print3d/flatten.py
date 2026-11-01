@@ -9,10 +9,12 @@ from __future__ import annotations
 import json
 import os
 import re
+from itertools import chain
 from pathlib import Path
 from typing import Any, Iterable, Literal
 
 from print3d.printers import DEFAULT_BED_TYPE, DEFAULT_PRINTER, PRESETS
+from print3d.windows import studio_profiles_locations
 
 ProfileKind = Literal["machine", "process", "filament"]
 META_SKIP = {"inherits", "include", "instantiation", "setting_id", "is_custom_defined"}
@@ -37,8 +39,13 @@ def detect_profiles_root(slicer_path: str | None = None) -> Path:
     if slicer_path:
         slicer = Path(slicer_path).resolve()
         candidates.append(slicer.parent.parent / "Resources" / "profiles")
+        # Beside the executable is the Windows layout, where the macOS bundle
+        # has the tree one level up in Contents/Resources.
+        candidates.append(slicer.parent / "resources" / "profiles")
     candidates.append(Path("/Applications/BambuStudio.app/Contents/Resources/profiles"))
-    for candidate in candidates:
+    # A Windows install is found the way find_studio finds the executable,
+    # since nothing hands flatten a slicer path to look beside.
+    for candidate in chain(candidates, studio_profiles_locations()):
         if (candidate / "BBL" / "machine").is_dir():
             return candidate
     raise FlattenError(
