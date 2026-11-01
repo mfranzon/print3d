@@ -111,6 +111,7 @@ print3d slices for the X2D unless you choose another printer it has presets for:
 | --- | --- | --- | --- |
 | Bambu Lab X2D | `x2d-0.4` (default) | two, 0.4 mm | 256 × 256 × 261 mm |
 | Bambu Lab P2S | `p2s-0.4` | one, 0.4 mm | 256 × 256 × 256 mm |
+| Bambu Lab H2C | `h2c-0.4` | two, 0.4 mm | 330 × 320 × 325 mm |
 
 ```bash
 print3d printer p2s-0.4      # saved in ~/print3d/printer.json
@@ -217,7 +218,7 @@ fill in and run again.
 | `plan model.stl out.gcode.3mf` | Show the Studio command without running it |
 | `status` | Where Blender and Studio were found, and the printer |
 | `doctor` | Probe Blender and Studio before writing a model; report paths, availability and versions |
-| `printer [x2d-0.4 \| p2s-0.4]` | Show the printer print3d slices for, or choose another |
+| `printer [x2d-0.4 \| p2s-0.4 \| h2c-0.4]` | Show the printer print3d slices for, or choose another |
 | `flatten [--printer <key>]` | Rebuild a printer's presets in `src/print3d/profiles/<key>/` from Studio's |
 | `setup` | Register print3d with your agents |
 | `mcp` | Run the MCP server on stdio (agents launch this) |

@@ -1,0 +1,15 @@
+Pinned Bambu Studio profiles for Bambu Lab H2C 0.4 mm.
+
+Studio version: 02.08.02.61 (Bambu Lab profile set 02.08.00.05)
+Source tree: C:\Program Files\Bambu Studio\resources\profiles\BBL
+Machine: Bambu Lab H2C 0.4 nozzle
+Process: 0.20mm Standard @BBL H2C
+Filament: Bambu PLA Basic @BBL H2C
+Bed: Textured PEI Plate
+
+These JSON files are flattened (inherits + include resolved, from=User)
+because the Studio CLI does not walk the GUI inheritance chain.
+
+Rebuild with: python -m print3d flatten --printer h2c-0.4
+Cube slice: tests/fixtures/cube_20mm.stl (100 layers, 3.57 g, 13m 55s; the X2D
+presets give 3.66 g, 13m 47s with the same Studio)

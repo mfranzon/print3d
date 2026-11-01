@@ -48,6 +48,11 @@ PRESETS: dict[str, Presets] = {
         process="0.20mm Standard @BBL P2S",
         filament="Bambu PLA Basic @BBL P2S",
     ),
+    "h2c-0.4": Presets(
+        machine="Bambu Lab H2C 0.4 nozzle",
+        process="0.20mm Standard @BBL H2C",
+        filament="Bambu PLA Basic @BBL H2C",
+    ),
 }
 
 

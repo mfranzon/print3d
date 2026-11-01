@@ -15,7 +15,7 @@ from print3d.handoff import job_printer
 from print3d.paths import default_profiles_dir
 from print3d.pipeline import run_job
 
-BUILT_IN = ("x2d-0.4", "p2s-0.4")
+BUILT_IN = ("x2d-0.4", "p2s-0.4", "h2c-0.4")
 
 
 @pytest.fixture(autouse=True)
@@ -45,22 +45,24 @@ def test_every_known_printer_has_its_presets_pinned():
 
 
 def test_the_presets_say_what_each_printer_is():
-    x2d, p2s = printers.printer_info("x2d-0.4"), printers.printer_info("p2s-0.4")
+    x2d, p2s, h2c = (printers.printer_info(key) for key in BUILT_IN)
     assert (x2d.name, x2d.nozzles, x2d.bed_mm) == ("Bambu Lab X2D", 2, (256.0, 256.0, 261.0))
     assert (p2s.name, p2s.nozzles, p2s.bed_mm) == ("Bambu Lab P2S", 1, (256.0, 256.0, 256.0))
-    for printer in (x2d, p2s):
+    assert (h2c.name, h2c.nozzles, h2c.bed_mm) == ("Bambu Lab H2C", 2, (330.0, 320.0, 325.0))
+    for printer in (x2d, p2s, h2c):
         assert (printer.nozzle_mm, printer.layer_mm, printer.bed_type) == (0.4, 0.2, "Textured PEI Plate")
         # Every overhang note relies on the slicer adding no supports.
         assert printer.supports is False
         assert printer.filament.startswith("Bambu PLA Basic @BBL")
 
 
-def test_the_p2s_presets_are_flat_and_belong_together():
-    folder = printers.PROFILES / "p2s-0.4"
+@pytest.mark.parametrize("key", BUILT_IN)
+def test_a_printers_presets_are_flat_and_belong_together(key):
+    folder = printers.PROFILES / key
     machine, process, filament = (
         json.loads((folder / f"{kind}.json").read_text()) for kind in ("machine", "process", "filament")
     )
-    presets = printers.PRESETS["p2s-0.4"]
+    presets = printers.PRESETS[key]
     assert machine["printer_settings_id"] == presets.machine
     assert process["print_settings_id"] == presets.process
     assert filament["filament_settings_id"] == [presets.filament]
@@ -84,6 +86,9 @@ def test_the_print_sheet_line_reads_the_presets():
     assert printers.printer_info("p2s-0.4").describe() == (
         "Bambu Lab P2S, 0.4 mm nozzle, 0.20 mm layers, Bambu PLA Basic, textured PEI, supports off"
     )
+    assert printers.printer_info("h2c-0.4").describe() == (
+        "Bambu Lab H2C, 0.4 mm nozzle, 0.20 mm layers, Bambu PLA Basic, textured PEI, supports off"
+    )
 
 
 def test_the_x2d_is_the_default():
@@ -102,7 +107,7 @@ def test_a_saved_choice_sticks_and_the_environment_overrides_it(own_printer_choi
 
 @pytest.mark.parametrize("key", ["a1-0.4", "../x2d-0.4", "x2d-0.4/..", "X2D-0.4", "p2s"])
 def test_an_unknown_printer_is_refused(key, own_printer_choice, monkeypatch):
-    with pytest.raises(ValueError, match="p2s-0.4, x2d-0.4"):
+    with pytest.raises(ValueError, match="h2c-0.4, p2s-0.4, x2d-0.4"):
         printers.choose_printer(key)
     assert not own_printer_choice.exists()
     monkeypatch.setenv(printers.PRINTER_ENV, key)
@@ -196,5 +201,5 @@ def test_flatten_resolves_a_printers_presets(tmp_path):
 
 
 def test_flatten_refuses_a_printer_it_has_no_presets_for(tmp_path):
-    with pytest.raises(FlattenError, match="p2s-0.4, x2d-0.4"):
+    with pytest.raises(FlattenError, match="h2c-0.4, p2s-0.4, x2d-0.4"):
         flatten_printer("a1-0.4", profiles_root=tmp_path, output_dir=tmp_path / "out")

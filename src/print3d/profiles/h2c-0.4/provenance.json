@@ -1,0 +1,16 @@
+{
+  "profiles_root": "C:\\Program Files\\Bambu Studio\\resources\\profiles",
+  "profiles_version": "02.08.00.05",
+  "machine": "Bambu Lab H2C 0.4 nozzle",
+  "process": "0.20mm Standard @BBL H2C",
+  "filaments": [
+    "Bambu PLA Basic @BBL H2C"
+  ],
+  "bed_type": "Textured PEI Plate",
+  "cli_overlay_applied": false,
+  "machine_keys": 119,
+  "process_keys": 197,
+  "filament_keys": [
+    141
+  ]
+}

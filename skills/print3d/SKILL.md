@@ -150,12 +150,12 @@ owns another: `printer(choose="p2s-0.4")`. The choice is saved. Every `make`
 report names the printer in `printer`; tell the user which printer the `.3mf`
 is set up for.
 
-| | X2D (`x2d-0.4`, the default) | P2S (`p2s-0.4`) |
-| --- | --- | --- |
-| Nozzles | two, 0.4 mm | one, 0.4 mm |
-| Build volume | 256 × 256 × 261 mm | 256 × 256 × 256 mm |
-| Colours | two print without a filament change | every colour after the first is an AMS filament change, with a purge and a prime tower |
+| | X2D (`x2d-0.4`, the default) | P2S (`p2s-0.4`) | H2C (`h2c-0.4`) |
+| --- | --- | --- | --- |
+| Nozzles | two, 0.4 mm | one, 0.4 mm | two, 0.4 mm |
+| Build volume | 256 × 256 × 261 mm | 256 × 256 × 256 mm | 330 × 320 × 325 mm |
+| Colours | two print without a filament change | every colour after the first is an AMS filament change, with a purge and a prime tower | two print without a filament change |
 
-Both: 0.20 mm layers, Bambu PLA Basic, textured PEI plate. **The pinned
+All three: 0.20 mm layers, Bambu PLA Basic, textured PEI plate. **The pinned
 processes have supports off** — that is why an overhang note is a real defect
 and not a setting to flip.
