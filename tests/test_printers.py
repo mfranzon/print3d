@@ -242,3 +242,17 @@ def test_flatten_looks_only_in_the_requested_vendors_profiles(tmp_path, monkeypa
     monkeypatch.setenv("BAMBU_PROFILES_ROOT", str(bambu_root))
     assert detect_profiles_root(vendor="Elegoo") == elegoo_root
     assert detect_profiles_root(vendor="BBL") == bambu_root
+
+
+def test_doctor_and_the_preflight_check_the_printers_slicer(tmp_path, cube_stl, monkeypatch):
+    from print3d.doctor import discover_dependencies
+    from print3d.pipeline import PipelineError
+    from print3d.studio import StudioError
+
+    monkeypatch.setenv(printers.PRINTER_ENV, "elegoo-cc-0.4")
+    monkeypatch.setenv("ELEGOO_SLICER_BIN", "")
+    monkeypatch.setattr("print3d.studio.find_elegoo", lambda search_path=None: (_ for _ in ()).throw(StudioError("ElegooSlicer CLI not found.")))
+    studio = discover_dependencies()["studio"]
+    assert (studio["ready"], studio["message"]) == (False, "ElegooSlicer CLI not found.")
+    with pytest.raises((StudioError, PipelineError), match="ElegooSlicer"):
+        run_job("a cube", mesh=cube_stl, execute=True, jobs_dir=tmp_path / "jobs")
