@@ -1,4 +1,4 @@
-"""Idea to a reviewable Bambu Studio project.
+"""Idea to a reviewable slicer project.
 
     prompt or photos  ->  Blender model script  ->  mesh  ->  DFM + printability
          |                    ^                                + likeness to the photos
@@ -19,11 +19,11 @@ from typing import Any
 from print3d.blender import BlenderError, run_model_script, scaffold_script
 from print3d.brief import PrintBrief, parse_brief
 from print3d.dfm import check_mesh, require_printable
-from print3d.filaments import DEFAULT_COLOUR, colour_hex, job_filaments
+from print3d.filaments import DEFAULT_COLOUR, colour_advice, colour_hex, job_filaments
 from print3d.fits import fit_advice, load_fits
-from print3d.flatten import load_pin
 from print3d.likeness import check_likeness, likeness_advice
 from print3d.paths import default_jobs_dir, default_profiles_dir
+from print3d.printers import Printer, read_printer
 from print3d.printability import (
     Advice,
     advise,
@@ -137,11 +137,11 @@ def _run_job(
     for required in ("machine.json", "process.json", "filament.json"):
         if not (profiles / required).is_file():
             raise PipelineError(
-                f"Pinned profile missing: {profiles / required}. Run: python -m print3d flatten"
+                f"Pinned profile missing: {profiles / required}. "
+                f"Run: python -m print3d flatten --printer {profiles.name}"
             )
-    pin = load_pin(profiles)
-    slicer = "ElegooSlicer" if pin["slicer"] == "elegoo" else "Bambu Studio"
-    report["printer"] = pin.get("printer", pin.get("machine"))
+    printer = read_printer(profiles)
+    report["printer"] = printer.as_dict()
 
     fits = load_fits()
     spec = load_spec(job_dir)
@@ -171,10 +171,10 @@ def _run_job(
         report["model"]["source"] = "blender"
 
     if report["model"].get("parts"):
-        return _run_parts(brief, job_dir, profiles, spec, fits, mesh_path, report, execute)
+        return _run_parts(brief, job_dir, profiles, printer, spec, fits, mesh_path, report, execute)
 
-    # 3. Is it even a solid?
-    dfm = require_printable(mesh_path)
+    # 3. Is it even a solid, and does it fit this printer?
+    dfm = require_printable(mesh_path, bed_mm=printer.bed_mm)
     report["dfm"] = dfm.as_dict()
     mesh_metrics = analyze_mesh(mesh_path)
     report["mesh_metrics"] = mesh_metrics
@@ -196,7 +196,8 @@ def _run_job(
         ),
         datadir=job_dir / "studio-datadir",
         output_dir=job_dir / "slice",
-        bed_type=pin["bed_type"],
+        bed_type=printer.bed_type,
+        slicer=printer.slicer,
         # Auto-orient would silently rotate the part and invalidate every
         # overhang note below. Orientation is the model script's business.
         orient=False,
@@ -239,7 +240,8 @@ def _run_job(
             "next_step": (
                 "Fix the errors in the model script and run again."
                 if severity == "error"
-                else f"Open the .3mf in {slicer}, check the preview, and print it from there."
+                else f"Open the .3mf in {printer.slicer_name} (set up for the {printer.name}), check the preview, "
+                "and print it from there."
             ),
         }
     )
@@ -249,6 +251,7 @@ def _run_job(
         job_dir,
         {
             "at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "printer": printer.key,
             "severity": severity,
             "size_mm": [round(v, 2) for v in mesh_metrics["size_mm"]],
             "triangles": mesh_metrics["triangles"],
@@ -266,6 +269,7 @@ def _run_parts(
     brief: PrintBrief,
     job_dir: Path,
     profiles: Path,
+    printer: Printer,
     spec: dict[str, Any],
     fits: dict[str, Any],
     assembly: Path,
@@ -273,8 +277,6 @@ def _run_parts(
     execute: bool,
 ) -> dict[str, Any]:
     """Several printed parts: a check per printed object, fits between them, one slice for all."""
-    pin = load_pin(profiles)
-    slicer = "ElegooSlicer" if pin["slicer"] == "elegoo" else "Bambu Studio"
     model = report["model"]
     parts = {part["name"]: part for part in model["parts"]}
 
@@ -302,7 +304,7 @@ def _run_parts(
     errors: list[str] = []
     metrics: dict[str, dict[str, Any]] = {}
     for obj in model["objects"]:
-        dfm = check_mesh(Path(obj["stl"]))
+        dfm = check_mesh(Path(obj["stl"]), bed_mm=printer.bed_mm)
         errors.extend(f"{obj['name']}: {error}" for error in dfm.errors)
         metrics[obj["name"]] = analyze_mesh(Path(obj["stl"]))
         notes.extend(mesh_advice(metrics[obj["name"]], part=obj["name"]))
@@ -320,16 +322,8 @@ def _run_parts(
         )
     if errors:
         raise PipelineError("; ".join(errors))
-    if len(colours) > pin["nozzles"]:
-        notes.append(
-            Advice(
-                "colours",
-                "note",
-                f"{len(colours)} colours on {pin['nozzles']} nozzles: the slicer swaps filament "
-                "within a nozzle, purging at every change.",
-                "Fine with a multi-material system; otherwise keep to one colour per nozzle per plate.",
-            )
-        )
+    if note := colour_advice(len(colours), printer):
+        notes.append(note)
     report["mesh_metrics"] = metrics
 
     likeness = check_likeness(assembly, spec, job_dir / "likeness")
@@ -379,7 +373,8 @@ def _run_parts(
         filaments=tuple(filaments),
         datadir=job_dir / "studio-datadir",
         output_dir=slice_dir,
-        bed_type=pin["bed_type"],
+        bed_type=printer.bed_type,
+        slicer=printer.slicer,
         orient=False,
         assemble_list=assemble,
     )
@@ -446,7 +441,8 @@ def _run_parts(
             "next_step": (
                 "Fix the errors in the model script and run again."
                 if severity == "error"
-                else f"Open the .3mf in {slicer}, check each plate, and print from there."
+                else f"Open the .3mf in {printer.slicer_name} (set up for the {printer.name}), check each plate, "
+                "and print from there."
             ),
         }
     )
@@ -456,6 +452,7 @@ def _run_parts(
         job_dir,
         {
             "at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "printer": printer.key,
             "severity": severity,
             "size_mm": [round(v, 2) for v in model["size_mm"]],
             "parts": {name: part["color"] for name, part in parts.items()},

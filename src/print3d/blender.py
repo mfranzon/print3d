@@ -15,8 +15,10 @@ Contract for a model script:
 
 from __future__ import annotations
 
+import glob
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -43,6 +45,8 @@ BLENDER_LOCATIONS = (
     "/snap/bin/blender",
     "~/.steam/steam/steamapps/common/Blender/blender",
     "~/.local/share/Steam/steamapps/common/Blender/blender",
+    "~/blender-*/blender",
+    "/opt/blender*/blender",
 )
 
 
@@ -61,8 +65,21 @@ def find_blender(search_path: str | None = None) -> Path:
     candidates.extend(BLENDER_LOCATIONS)
     for candidate in chain(candidates, blender_locations()):
         path = Path(candidate).expanduser()
-        if path.is_file():
-            return path.resolve()
+        # Hermes expands '*' in declared paths and tries higher versions first.
+        # Escape other glob metacharacters, including those in the home directory.
+        if "*" in str(path):
+            pattern = "*".join(glob.escape(part) for part in str(path).split("*"))
+            matches = sorted(
+                (Path(match) for match in glob.glob(pattern)),
+                key=lambda match: [(1, int(p)) if p.isdigit() else (0, p)
+                                   for p in re.split(r"(\d+)", str(match))],
+                reverse=True,
+            )
+        else:
+            matches = [path]
+        for match in matches:
+            if match.is_file():
+                return match.resolve()
     raise BlenderError(
         f"Blender not found. Install Blender or set {BLENDER_ENV} to the executable "
         "(on macOS: /Applications/Blender.app/Contents/MacOS/Blender)."

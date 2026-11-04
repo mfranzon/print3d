@@ -7,9 +7,9 @@ Two signals feed the optimise loop:
   - the sliced gcode, which is the ground truth for time, material and how the
     part is built up layer by layer.
 
-The pinned X2D process has `enable_support = 0`, so the slicer will not warn
-about an overhang - it will just print it badly. That is why the mesh analysis
-carries most of the weight here.
+The pinned processes (X2D and P2S) have `enable_support = 0`, so the slicer will
+not warn about an overhang - it will just print it badly. That is why the mesh
+analysis carries most of the weight here.
 """
 
 from __future__ import annotations
@@ -149,9 +149,9 @@ def analyze_slice(project: Path, plate: int = 1) -> dict[str, Any]:
     # Bambu Studio writes the settings block at the top, ending at
     # CONFIG_BLOCK_END. ElegooSlicer (Orca lineage) writes the same block at
     # the bottom, after the gcode, so the moves and summary lines sit before
-    # CONFIG_BLOCK_START. Either way the block holds only comments, so one
-    # pass over all lines - skipping the block itself - collects both the
-    # summary and the moves without a second scan.
+    # CONFIG_BLOCK_START. One pass collects both: summary comments are read
+    # only outside the block, so a setting can never pose as the summary, and
+    # moves are read everywhere, so a block left unclosed cannot hide them.
     estimated_time = None
     weight_g = None
     layer_count = None
@@ -172,9 +172,9 @@ def analyze_slice(project: Path, plate: int = 1) -> dict[str, Any]:
         if "CONFIG_BLOCK_END" in stripped:
             in_block = False
             continue
-        if in_block:
-            continue
         if first == ";":
+            if in_block:
+                continue
             if estimated_time is None:
                 match = TIME_RE.search(stripped) or ORCA_TIME_RE.search(stripped)
                 if match:

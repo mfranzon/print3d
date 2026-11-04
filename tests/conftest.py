@@ -39,3 +39,17 @@ def write_cube_stl(path: Path, size_mm: float = 20.0) -> Path:
 @pytest.fixture
 def cube_stl(tmp_path: Path) -> Path:
     return write_cube_stl(tmp_path / "cube.stl", 20.0)
+
+
+@pytest.fixture(autouse=True)
+def own_printer_choice(tmp_path: Path, monkeypatch) -> Path:
+    """Keep the user's saved printer (~/print3d/printer.json) out of every test.
+
+    $PRINT3D_PRINTER still applies, so the live Studio tests can run against
+    another printer: PRINT3D_PRINTER=p2s-0.4 PRINT3D_STUDIO_IT=1 pytest.
+    """
+    from print3d import printers
+
+    path = tmp_path / "printer-choice" / "printer.json"
+    monkeypatch.setattr(printers, "choice_path", lambda: path)
+    return path

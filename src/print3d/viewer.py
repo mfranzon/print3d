@@ -63,9 +63,9 @@ PAGE = r"""<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>print3d viewer</title>
 <style>
-:root { --bg: #f4f4f2; --panel: rgba(255,255,255,.88); --ink: #1d1d1b; --sub: #6b6b66; --line: #d9d9d4; --grid: #c9c9c3; }
+:root { --bg: #f4f4f2; --panel: rgba(255,255,255,.88); --ink: #1d1d1b; --sub: #6b6b66; --line: #d9d9d4; --grid: #c9c9c3; --mark: #e0482b; }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #18181a; --panel: rgba(32,32,35,.88); --ink: #ececea; --sub: #9a9a96; --line: #3a3a3e; --grid: #3a3a3e; }
+  :root { --bg: #18181a; --panel: rgba(32,32,35,.88); --ink: #ececea; --sub: #9a9a96; --line: #3a3a3e; --grid: #3a3a3e; --mark: #ff6a4d; }
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -75,6 +75,13 @@ canvas { display: block; }
 #panel { position: absolute; top: 12px; left: 12px; max-width: min(320px, calc(100% - 24px));
   background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
   backdrop-filter: blur(8px); }
+#panel:not([open]) { padding: 8px 12px; }
+summary { display: flex; align-items: flex-start; gap: 8px; list-style: none; cursor: pointer; }
+summary::-webkit-details-marker { display: none; }
+.head { flex: 1; min-width: 0; }
+.chev { flex: none; width: 16px; height: 16px; margin-top: 1px; color: var(--sub); transition: transform .15s; }
+#panel[open] .chev { transform: rotate(180deg); }
+#panel:not([open]) :is(h1, .sub) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 h1 { font-size: 14px; margin: 0 0 4px; font-weight: 600; }
 .sub { color: var(--sub); }
 .parts { margin: 10px 0 0; padding: 0; list-style: none; }
@@ -86,6 +93,10 @@ button { font: inherit; color: var(--ink); background: transparent; border: 1px 
   border-radius: 6px; padding: 3px 9px; cursor: pointer; }
 button[aria-pressed=true] { background: var(--line); }
 #hint { position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; color: var(--sub); pointer-events: none; }
+#readout { position: absolute; transform: translate(-50%, calc(-100% - 10px)); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px; white-space: nowrap;
+  pointer-events: none; font-variant-numeric: tabular-nums; }
+body.measuring canvas { cursor: crosshair; }
 #error { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; padding: 24px; text-align: center; }
 </style>
 <script type="importmap">
@@ -93,9 +104,11 @@ button[aria-pressed=true] { background: var(--line); }
 </script>
 </head>
 <body>
-<div id="panel">
-  <h1 id="title"></h1>
-  <div class="sub" id="stats"></div>
+<details id="panel" open>
+  <summary>
+    <div class="head"><h1 id="title"></h1><div class="sub" id="stats"></div></div>
+    <svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </summary>
   <ul class="parts" id="parts"></ul>
   <div class="row" id="explode-row" hidden>
     <span>Explode</span><input type="range" id="explode" min="0" max="1.5" step="0.01" value="0">
@@ -104,9 +117,25 @@ button[aria-pressed=true] { background: var(--line); }
     <button id="reset">Reset view</button>
     <button id="wire" aria-pressed="false">Wireframe</button>
     <button id="grid-btn" aria-pressed="true">Grid</button>
+    <button id="measure" aria-pressed="false">Measure</button>
   </div>
-</div>
+</details>
+<script>
+// The panel folds to its title, and starts folded in a narrow pane such as the
+// Hermes desktop preview. Set before the first paint, so it does not animate;
+// only a click is saved, so rebuilds of the page keep the user's own choice.
+(() => {
+  const panel = document.getElementById('panel');
+  let saved = null;
+  try { saved = localStorage.getItem('print3d.panel'); } catch {}
+  panel.open = saved ? saved === 'open' : window.innerWidth >= 700;
+  panel.querySelector('summary').addEventListener('click', () => {
+    try { localStorage.setItem('print3d.panel', panel.open ? 'closed' : 'open'); } catch {}
+  });
+})();
+</script>
 <div id="hint">Drag to rotate · scroll to zoom · right-drag to pan</div>
+<div id="readout" hidden></div>
 <div id="error">Could not load three.js from the CDN. The viewer needs an internet connection the first time.</div>
 <script type="application/json" id="data">__DATA__</script>
 <script type="module">
@@ -183,6 +212,7 @@ function reset() {
 }
 
 document.getElementById('title').textContent = DATA.title;
+document.getElementById('title').title = DATA.title;  // the whole of it while folded to one line
 const stats = [`${fmt(size.x)} × ${fmt(size.y)} × ${fmt(size.z)} mm`];
 if (DATA.minutes != null) stats.push(`${Math.round(DATA.minutes)} min`);
 if (DATA.grams != null) stats.push(`${fmt(DATA.grams)} g`);
@@ -211,6 +241,76 @@ const toggle = (id, apply) => {
 toggle('wire', on => meshes.forEach(m => { m.material.wireframe = on; }));
 toggle('grid-btn', on => { grid.visible = on; });
 
+// Measure: two clicks on the mesh, and the distance between them. A click within
+// a few pixels of a corner of the face under it lands on that corner, so edge to
+// edge reads exactly; anywhere else it takes the point on the surface.
+const markColour = getComputedStyle(document.documentElement).getPropertyValue('--mark').trim();
+const picks = [];
+const dots = new THREE.Points(new THREE.BufferGeometry(),
+  new THREE.PointsMaterial({ color: markColour, size: 9, sizeAttenuation: false, depthTest: false }));
+const rule = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: markColour, depthTest: false }));
+[dots, rule].forEach(o => { o.renderOrder = 1; o.frustumCulled = false; scene.add(o); });
+const readout = document.getElementById('readout');
+const hint = document.getElementById('hint');
+const hintText = hint.textContent;
+let measuring = false;
+
+function drawPicks() {
+  dots.geometry.setFromPoints(picks);
+  rule.geometry.setFromPoints(picks.length === 2 ? picks : []);
+  readout.hidden = picks.length < 2;
+  if (picks.length < 2) return;
+  const d = picks[1].clone().sub(picks[0]);
+  readout.innerHTML = `<b>${fmt(d.length(), 2)} mm</b> <span class="sub">` +
+    `Δx ${fmt(Math.abs(d.x))} · Δy ${fmt(Math.abs(d.y))} · Δz ${fmt(Math.abs(d.z))}</span>`;
+}
+function clearPicks() { picks.length = 0; drawPicks(); }
+
+const ray = new THREE.Raycaster();
+function pick(x, y) {
+  const r = renderer.domElement.getBoundingClientRect();
+  const ndc = new THREE.Vector2((x - r.left) / r.width * 2 - 1, -(y - r.top) / r.height * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const [hit] = ray.intersectObjects(meshes.filter(m => m.visible), false);  // the raycaster ignores .visible
+  if (!hit) return null;
+  const position = hit.object.geometry.attributes.position;
+  let best = hit.point, bestPx = 8;
+  for (const i of [hit.face.a, hit.face.b, hit.face.c]) {
+    const corner = new THREE.Vector3().fromBufferAttribute(position, i).applyMatrix4(hit.object.matrixWorld);
+    const s = corner.clone().project(camera);
+    const px = Math.hypot((s.x - ndc.x) * r.width / 2, (s.y - ndc.y) * r.height / 2);
+    if (px < bestPx) { best = corner; bestPx = px; }
+  }
+  return best.clone();
+}
+
+// A click, not the end of a drag that turned the view.
+let down = null;
+renderer.domElement.addEventListener('pointerdown', e => { down = e.button === 0 ? [e.clientX, e.clientY] : null; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!measuring || !down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4) return;
+  const p = pick(e.clientX, e.clientY);
+  if (!p) return;
+  if (picks.length === 2) picks.length = 0;
+  picks.push(p);
+  drawPicks();
+});
+toggle('measure', on => {
+  measuring = on;
+  document.body.classList.toggle('measuring', on);
+  hint.textContent = on ? 'Click two points to measure · Esc to clear' : hintText;
+  clearPicks();
+});
+window.addEventListener('keydown', e => { if (e.key === 'Escape') clearPicks(); });
+document.getElementById('explode').addEventListener('input', clearPicks);  // the points would stay behind
+
+function placeReadout() {
+  if (picks.length < 2) return;
+  const mid = picks[0].clone().add(picks[1]).multiplyScalar(0.5).project(camera);
+  readout.style.left = `${(mid.x + 1) / 2 * window.innerWidth}px`;
+  readout.style.top = `${(1 - mid.y) / 2 * window.innerHeight}px`;
+}
+
 function resize() {
   renderer.setSize(window.innerWidth, window.innerHeight);
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -219,7 +319,7 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 reset();
-renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+renderer.setAnimationLoop(() => { controls.update(); placeReadout(); renderer.render(scene, camera); });
 </script>
 <script>
 // A module that never ran means the CDN import failed.

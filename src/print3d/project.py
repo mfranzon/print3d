@@ -12,9 +12,9 @@ from typing import Any
 from xml.etree import ElementTree as ET
 
 PLATE_GCODE_RE = re.compile(r"^Metadata/plate_(\d+)\.gcode$")
-TIME_RE = re.compile(r"total estimated time:\s*(.+)$", re.IGNORECASE)
+TIME_RE = re.compile(r"total estimated time:\s*(.+)$", re.IGNORECASE | re.MULTILINE)
 ORCA_TIME_RE = re.compile(
-    r"estimated printing time \((?:normal|quiet) mode\)\s*=\s*(.+)$", re.IGNORECASE
+    r"estimated printing time \((?:normal|quiet) mode\)\s*=\s*(.+)$", re.IGNORECASE | re.MULTILINE
 )
 FILAMENT_G_RE = re.compile(r"total filament weight \[g\]\s*[:=]\s*([0-9.]+)", re.IGNORECASE)
 FILAMENT_M_RE = re.compile(
@@ -151,7 +151,7 @@ def inspect_project(path: Path) -> dict[str, Any]:
             slice_info = archive.read("Metadata/slice_info.config").decode("utf-8", "replace")
         parsed_info = _parse_slice_info(slice_info)
         for index, member in gcodes:
-            gcode_bytes, gcode_text = _cached_plate_gcode(str(resolved), index)
+            gcode_bytes, gcode_text = _plate_gcode(resolved, index)
             md5_name = f"Metadata/plate_{index}.gcode.md5"
             md5_ok: bool | None = None
             if md5_name in names:
@@ -198,24 +198,26 @@ def extract_plate_png(path: Path, dest: Path, plate: int = 1) -> Path | None:
 
 def read_plate_gcode(path: Path, plate: int = 1) -> str:
     """The raw gcode for one plate of a sliced project."""
-    return _cached_plate_gcode(str(_resolve_3mf(path)), plate)[1]
+    return _plate_gcode(path, plate)[1]
 
 
-def _resolve_3mf(path: Path) -> Path:
-    return path.expanduser().resolve()
+def _plate_gcode(path: Path, plate: int) -> tuple[bytes, str]:
+    """The plate's gcode as (bytes, text), re-read whenever the file changes."""
+    resolved = path.expanduser().resolve()
+    st = resolved.stat()
+    return _cached_plate_gcode(str(resolved), plate, st.st_mtime_ns, st.st_size)
 
 
-@lru_cache(maxsize=4)
-def _cached_plate_gcode(path_str: str, plate: int) -> tuple[bytes, str]:
+@lru_cache(maxsize=2)
+def _cached_plate_gcode(path_str: str, plate: int, _mtime_ns: int, _size: int) -> tuple[bytes, str]:
     """The plate's gcode as (bytes, text), memoized per file state.
 
     The pipeline inspects the same sliced project several times (inspection,
     per-plate analysis, hand-off); decompressing multi-megabyte gcode per call
-    dominated small-job runtimes. The file's mtime and size key the cache, so
-    a re-sliced or repaired project is re-read.
+    dominated small-job runtimes. The file's mtime and size are part of the
+    key, so a re-sliced or repaired project is re-read.
     """
     resolved = Path(path_str)
-    st = resolved.stat()
     with zipfile.ZipFile(resolved) as archive:
         member = f"Metadata/plate_{plate}.gcode"
         if member not in archive.namelist():

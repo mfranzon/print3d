@@ -16,6 +16,7 @@ from mcp.server.mcpserver import Image, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
+from print3d import printers
 from print3d import spec as specs
 from print3d.dfm import check_mesh
 from print3d.fits import load_fits, save_fits
@@ -29,12 +30,13 @@ from print3d.viewer import build_viewer
 from print3d.printability import advise, analyze_mesh, analyze_slice, dfm_advice, worst_severity
 
 INSTRUCTIONS = """\
-print3d turns an idea, or a photo of an object, into a sliced print project for
-an Elegoo Centauri Carbon or Centauri Carbon 2 (via ElegooSlicer), or a Bambu
-Lab X2D (via Bambu Studio). You write a Blender (bpy) model script; `make` runs
-it, checks the
-mesh, slices it and returns advice, each note with the fix to apply to the script.
-Iterate until no note is at `error`, then hand the user the .3mf path.
+print3d turns an idea, or a photo of an object, into a sliced project for the
+user's printer: a Bambu Lab X2D or P2S (via Bambu Studio), or an Elegoo Centauri
+Carbon or Centauri Carbon 2 (via ElegooSlicer). `printer` shows which one print3d
+slices for, and switches. You write a Blender (bpy) model script; `make` runs it,
+checks the mesh against that printer, slices it and returns advice, each note with
+the fix to apply to the script. Iterate until no note is at `error`, then hand the
+user the .3mf path and name the printer in the report's `printer`.
 
 Read guide("workflow") before the first run. From a photo of an object, also read
 guide("from-photo"): it records every dimension with its evidence and adds a
@@ -149,6 +151,16 @@ def fits(
     """
     values = {k: v for k, v in {"press": press, "snug": snug, "slide": slide, "free": free}.items() if v is not None}
     return _json(save_fits(values) if values else load_fits())
+
+
+@tool()
+def printer(choose: str | None = None) -> str:
+    """The printer print3d slices for: build volume, nozzles, slicer, presets, and the others it has.
+
+    Pass `choose` (e.g. "p2s-0.4", "x2d-0.4" or "elegoo-cc-0.4") to switch; the choice is saved for every later
+    job and rerun. Only switch when the user asks for a different printer.
+    """
+    return _json(printers.choose_printer(choose) if choose else printers.status())
 
 
 @tool(images=True, read_only=True)

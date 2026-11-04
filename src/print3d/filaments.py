@@ -1,9 +1,10 @@
 """Coloured copies of the pinned filament, one per colour a job asks for.
 
 Colour is the only thing that changes: the material stays the pinned Bambu PLA
-Basic, so every check and the slice keep meaning the same thing. Studio puts
-the first two filaments on the X2D's two nozzles; a third or more is swapped in
-on one of them, with a purge per change.
+Basic, so every check and the slice keep meaning the same thing. On the X2D,
+Studio puts the first two filaments on its two nozzles; a third or more is
+swapped in on one of them, with a purge per change. The P2S has one nozzle, so
+every colour after the first is such a swap, through the AMS.
 """
 
 from __future__ import annotations
@@ -11,6 +12,9 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+
+from print3d.printability import Advice
+from print3d.printers import Printer
 
 # Bambu PLA Basic, as the colours are named on the spool.
 COLOURS = {
@@ -34,11 +38,29 @@ COLOURS = {
 }
 DEFAULT_COLOUR = "green"
 HEX_RE = re.compile(r"^#?[0-9a-fA-F]{6}$")
-NOZZLES = 2
+NUMBERS = {1: "one", 2: "two", 3: "three", 4: "four"}
 
 
 class FilamentError(ValueError):
     """Raised for a colour that is neither a known name nor #RRGGBB."""
+
+
+def _count(n: int, noun: str) -> str:
+    return f"{NUMBERS.get(n, str(n))} {noun}{'' if n == 1 else 's'}"
+
+
+def colour_advice(colours: int, printer: Printer) -> Advice | None:
+    """A note when a job has more colours than the printer has nozzles: each extra one is a purged swap."""
+    if colours <= printer.nozzles:
+        return None
+    return Advice(
+        "colours",
+        "note",
+        f"{_count(colours, 'colour')} on the {printer.name}'s {_count(printer.nozzles, 'nozzle')}: "
+        f"{printer.slicer_name} swaps filament within a nozzle, purging at every change.",
+        f"Needs {'an AMS' if printer.slicer == 'bambu' else 'a multi-material unit'} to print unattended; "
+        f"without one, keep to {_count(printer.nozzles, 'colour')} per plate.",
+    )
 
 
 def colour_hex(colour: str | None) -> str:

@@ -4,6 +4,7 @@ import zipfile
 from pathlib import Path
 
 from print3d.printability import analyze_slice
+from print3d.project import inspect_project, read_plate_gcode
 
 SLICE_INFO = """<?xml version="1.0" encoding="UTF-8"?>
 <config>
@@ -68,3 +69,30 @@ def test_bambu_layout_still_reads_from_the_top(tmp_path: Path):
     # The layer count line sits after the settings block; the single pass
     # still reads it, so it stands in for nothing.
     assert metrics["layer_count"] == 100
+
+
+def test_inspect_project_reads_the_orca_time_after_the_gcode(tmp_path: Path):
+    plate = inspect_project(_orca_project(tmp_path))["plates"][0]
+    assert plate["estimated_time"] == "10m 5s"
+
+
+def test_a_resliced_project_is_read_again(tmp_path: Path):
+    project = _orca_project(tmp_path)
+    assert "E30.156" in read_plate_gcode(project)
+    with zipfile.ZipFile(project, "w") as archive:
+        archive.writestr("Metadata/plate_1.gcode", GCODE.replace("E30.156", "E31.5") + "; resliced\n")
+    assert "E31.5" in read_plate_gcode(project)
+
+
+def test_an_unclosed_settings_block_hides_no_moves(tmp_path: Path):
+    project = tmp_path / "cube.gcode.3mf"
+    with zipfile.ZipFile(project, "w") as archive:
+        archive.writestr(
+            "Metadata/plate_1.gcode",
+            "; CONFIG_BLOCK_START\n; total layer number: 999\nM83\nG1 Z0.2\nG1 X5 Y0 E1.0\n",
+        )
+    metrics = analyze_slice(project)
+    assert metrics["printed_layers"] == 1
+    # A setting inside the block never poses as the summary; the count falls
+    # back to the printed layers.
+    assert metrics["layer_count"] == 1

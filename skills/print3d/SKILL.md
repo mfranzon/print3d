@@ -1,6 +1,6 @@
 ---
 name: print3d
-description: Model a part in Blender from an idea, a photo of an object, or the shop listing of something you would otherwise buy, slice it for the Elegoo Centauri Carbon (ElegooSlicer) or the Bambu X2D, and iterate until it prints clean and matches the photo.
+description: Model a part in Blender from an idea, a photo of an object, or the shop listing of something you would otherwise buy, slice it for the user's Bambu Lab X2D or P2S or Elegoo Centauri Carbon or Carbon 2, and iterate until it prints clean and matches the photo.
 argument-hint: "[what to make, a photo of the object, or a shop link]"
 disable-model-invocation: true
 ---
@@ -79,7 +79,8 @@ asks for.
 print3d make "<prompt>"
 ```
 
-Models, DFM-checks, slices with the pinned X2D presets, and reports. The run is
+Models, DFM-checks, slices with the pinned presets of the chosen printer, and
+reports. The run is
 **red** when `severity` is `error` — exit code 1, `status: needs_work`.
 
 While red: read `advice`, apply the `fix` each note carries to `model.py`, run
@@ -134,7 +135,23 @@ and the print sheet.
 
 ## The machine
 
-X2D, 0.4 mm nozzle, 256 × 256 × 260 mm bed, 0.20 mm layers, Bambu PLA Basic,
-textured PEI plate. **The pinned process has supports off** — that is why an
-overhang note is a real defect and not a setting to flip. Two nozzles: two
-colours print without a filament change.
+print3d slices for one printer at a time. Before the first run, check which one
+with `printer` (`print3d printer` on the command line), and switch when the user
+owns another: `printer(choose="p2s-0.4")`. The choice is saved. Every `make`
+report names the printer in `printer`; tell the user which printer the `.3mf`
+is set up for.
+
+| | X2D (`x2d-0.4`, the default) | P2S (`p2s-0.4`) |
+| --- | --- | --- |
+| Nozzles | two, 0.4 mm | one, 0.4 mm |
+| Build volume | 256 × 256 × 261 mm | 256 × 256 × 256 mm |
+| Colours | two print without a filament change | every colour after the first is an AMS filament change, with a purge and a prime tower |
+
+The Elegoo Centauri Carbon (`elegoo-cc-0.4`) and Centauri Carbon 2
+(`elegoo-cc2-0.4`) are one-nozzle printers like the P2S, sliced in ElegooSlicer
+with Elegoo PLA; each colour after the first is a filament change.
+
+All: 0.20 mm layers, textured PEI plate, PLA (Bambu PLA Basic on the Bambu Lab
+printers). **The pinned
+processes have supports off** — that is why an overhang note is a real defect
+and not a setting to flip.

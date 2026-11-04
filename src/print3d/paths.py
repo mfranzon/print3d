@@ -6,6 +6,8 @@ import os
 import re
 from pathlib import Path
 
+from print3d.printers import PROFILES, active_printer
+
 PACKAGE = Path(__file__).resolve().parent
 JOBS_ENV = "PRINT3D_JOBS"
 NAME_RE = re.compile(r"[a-z0-9_-]{1,64}")
@@ -16,23 +18,8 @@ def repo_root() -> Path:
 
 
 def default_profiles_dir() -> Path:
-    """`PRINT3D_PROFILES`, else the pinned profile set for `PRINT3D_PRINTER`.
-
-    PRINT3D_PRINTER picks the printer: `cc` (Elegoo Centauri Carbon, the
-    default), `cc2` (Centauri Carbon 2) or `x2d` (Bambu Lab X2D).
-    """
-    if env := os.environ.get("PRINT3D_PROFILES", "").strip():
-        return Path(env).expanduser()
-    preset = os.environ.get("PRINT3D_PRINTER", "cc").strip().lower()
-    chosen = {
-        "cc": "elegoo-cc-0.4",
-        "cc2": "elegoo-cc2-0.4",
-        "x2d": "x2d-0.4",
-    }.get(preset, "elegoo-cc-0.4")
-    chosen_dir = PACKAGE / "profiles" / chosen
-    if chosen_dir.is_dir():
-        return chosen_dir
-    return PACKAGE / "profiles" / "x2d-0.4"
+    """The pinned presets of the printer print3d slices for (see printers.py)."""
+    return PROFILES / active_printer()
 
 
 def coupon_script() -> Path:

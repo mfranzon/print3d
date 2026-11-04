@@ -1,8 +1,9 @@
 """Slicer CLI wrapper. Isolated --datadir, dry-run first.
 
 The command line of ElegooSlicer (an OrcaSlicer fork) is flag-compatible with
-Bambu Studio's, so one wrapper drives both: ElegooSlicer is preferred when it
-is installed, Bambu Studio remains the fallback.
+Bambu Studio's, so one wrapper drives both. The request names which one, from
+the printer's presets: each slicer only reads its own vendor's profiles, so
+there is no falling back from one to the other.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
+from print3d.printers import SLICERS
 from print3d.repair_3mf import repair_bambu_3mf
 from print3d.windows import elegoo_locations, studio_locations
 
@@ -41,6 +43,8 @@ class SliceRequest:
     # Several parts: the slicer reads the meshes, filaments and plates from this
     # file instead of from input_mesh.
     assemble_list: Path | None = None
+    # Which slicer reads the presets: a key of printers.SLICERS.
+    slicer: str = "bambu"
 
 
 def _first_file(candidates: Iterable[str | Path]) -> Path | None:
@@ -94,16 +98,13 @@ def find_elegoo(search_path: str | None = None) -> Path:
     )
 
 
-def find_slicer(search_path: str | None = None) -> Path:
-    """ElegooSlicer when installed, Bambu Studio otherwise."""
-    try:
+def find_slicer(slicer: str = "bambu", search_path: str | None = None) -> Path:
+    """The CLI of `slicer` (a key of printers.SLICERS)."""
+    if slicer == "elegoo":
         return find_elegoo(search_path)
-    except StudioError:
+    if slicer == "bambu":
         return find_studio(search_path)
-
-
-def slicer_name(binary: Path) -> str:
-    return "ElegooSlicer" if "elegoo" in binary.name.lower() else "Bambu Studio"
+    raise StudioError(f"Unknown slicer {slicer!r}; print3d drives {', '.join(SLICERS)}.")
 
 
 def _common_prefix(studio: Path, request: SliceRequest) -> list[str]:
@@ -223,18 +224,19 @@ def slice_plan(request: SliceRequest, *, studio: Path | None = None) -> dict[str
     if binary is None:
         # A plan is only a preview; name the binary even when it is not installed.
         try:
-            binary = find_slicer()
+            binary = find_slicer(request.slicer)
         except StudioError:
-            binary = Path("elegoo-slicer")
+            binary = Path("elegoo-slicer" if request.slicer == "elegoo" else "bambu-studio")
+    name = SLICERS[request.slicer]
     return {
         "dry_run": True,
         "studio": str(binary),
-        "slicer": slicer_name(binary),
+        "slicer": name,
         "project_command": build_project_command(binary, request),
         "command": build_slice_command(binary, request),
         "request": _request_dict(request),
         "open_in_studio": str(project_3mf_path(request)),
-        "note": f"Open the .3mf (not .gcode.3mf) in {slicer_name(binary)} File > Open. "
+        "note": f"Open the .3mf (not .gcode.3mf) in {name} File > Open. "
         ".gcode.3mf is a sliced print job and the Prepare tab reports no geometry.",
     }
 
@@ -246,11 +248,11 @@ def _run(command: list[str], timeout_s: float) -> subprocess.CompletedProcess[st
 def _require_file(path: Path, result: subprocess.CompletedProcess[str], label: str) -> None:
     if result.returncode != 0:
         raise StudioError(
-            f"Bambu Studio {label} failed with exit {result.returncode}.\n"
+            f"Slicer {label} failed with exit {result.returncode}.\n"
             f"stderr tail:\n{(result.stderr or result.stdout)[-4000:]}"
         )
     if not path.is_file():
-        raise StudioError(f"Studio {label} exited 0 but did not write {path}")
+        raise StudioError(f"Slicer {label} exited 0 but did not write {path}")
 
 
 def run_slice(
@@ -259,7 +261,7 @@ def run_slice(
     studio: Path | None = None,
     timeout_s: float = 180,
 ) -> dict[str, Any]:
-    binary = studio or find_slicer()
+    binary = studio or find_slicer(request.slicer)
     plan = slice_plan(request, studio=binary)
     plan["dry_run"] = False
     request.datadir.mkdir(parents=True, exist_ok=True)

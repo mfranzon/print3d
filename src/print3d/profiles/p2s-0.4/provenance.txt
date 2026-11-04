@@ -1,0 +1,15 @@
+Pinned Bambu Studio profiles for Bambu Lab P2S 0.4 mm.
+
+Studio version: 02.08.03.66 (Bambu Lab profile set 02.08.00.06)
+Source tree: /Applications/BambuStudio.app/Contents/Resources/profiles/BBL
+Machine: Bambu Lab P2S 0.4 nozzle
+Process: 0.20mm Standard @BBL P2S
+Filament: Bambu PLA Basic @BBL P2S
+Bed: Textured PEI Plate
+
+These JSON files are flattened (inherits + include resolved, from=User)
+because the Studio CLI does not walk the GUI inheritance chain.
+
+Rebuild with: python -m print3d flatten --printer p2s-0.4
+Cube slice: tests/fixtures/cube_20mm.stl (100 layers, 3.54 g, 15m 38s; the X2D
+presets give 3.66 g, 13m 47s with the same Studio)

@@ -1,0 +1,16 @@
+{
+  "profiles_root": "/Applications/BambuStudio.app/Contents/Resources/profiles",
+  "profiles_version": "02.08.00.06",
+  "machine": "Bambu Lab P2S 0.4 nozzle",
+  "process": "0.20mm Standard @BBL P2S",
+  "filaments": [
+    "Bambu PLA Basic @BBL P2S"
+  ],
+  "bed_type": "Textured PEI Plate",
+  "cli_overlay_applied": false,
+  "machine_keys": 117,
+  "process_keys": 198,
+  "filament_keys": [
+    139
+  ]
+}
