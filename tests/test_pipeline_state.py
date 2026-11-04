@@ -55,7 +55,7 @@ def job(tmp_path, monkeypatch, request):
 
     monkeypatch.setattr(pipeline, "run_model_script", model)
     monkeypatch.setattr(pipeline, "run_slice", slice_)
-    monkeypatch.setattr(pipeline, "find_studio", lambda: Path("fixture-studio"))
+    monkeypatch.setattr(pipeline, "find_slicer", lambda *_: Path("fixture-studio"))
 
     def run(**kwargs):
         return pipeline.run_job("state test cube", script=script, jobs_dir=tmp_path / "jobs", **kwargs)
@@ -72,10 +72,10 @@ def test_missing_studio_stops_before_modelling_and_blocks_old_handoff(job, monke
     previous_sheet = sheet.read_bytes()
     state["status_at_model_start"] = None
 
-    def missing():
+    def missing(*_):
         raise StudioError("Set BAMBU_STUDIO_BIN")
 
-    monkeypatch.setattr(pipeline, "find_studio", missing)
+    monkeypatch.setattr(pipeline, "find_slicer", missing)
     with pytest.raises(StudioError, match="BAMBU_STUDIO_BIN"):
         run()
     assert state["status_at_model_start"] is None
@@ -88,7 +88,7 @@ def test_missing_studio_stops_before_modelling_and_blocks_old_handoff(job, monke
 
 def test_dry_run_does_not_require_studio(job, monkeypatch):
     _, _, run = job
-    monkeypatch.setattr(pipeline, "find_studio", lambda: pytest.fail("dry run probed Studio"))
+    monkeypatch.setattr(pipeline, "find_slicer", lambda *_: pytest.fail("dry run probed Studio"))
     assert run(execute=False)["status"] == "dry_run"
 
 

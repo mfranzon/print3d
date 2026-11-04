@@ -2,10 +2,12 @@
 
 A [Hermes Agent](https://github.com/NousResearch/hermes-agent) plugin that turns
 an idea, a photo of an object, or the shop listing of something you would
-otherwise buy into a Bambu Studio project for a **Bambu Lab X2D or P2S (0.4 mm
-nozzle)**. One part or several, in one colour or two, with fits measured against
-your own printer, a 3D view to turn the result around in, and a print sheet to
-hand on. It also works with Claude Code, Codex, Cursor and Gemini CLI.
+otherwise buy into a sliced print project for a **Bambu Lab X2D or P2S (0.4 mm
+nozzle, via Bambu Studio)** or an **Elegoo Centauri Carbon or Centauri Carbon 2
+(0.4 mm nozzle, via ElegooSlicer)**. One part or several, in one colour or two,
+with fits measured against your own printer, a 3D view to turn the result around
+in, and a print sheet to hand on. It also works with Claude Code, Codex, Cursor
+and Gemini CLI.
 
 ![From a museum photo of a wooden peg to a sliced, printable model, in eight steps](docs/workflow.gif)
 
@@ -15,12 +17,12 @@ measured with evidence, modelled, checked against the photo, sliced.
 [the benchmark](#benchmark-a-clothes-peg-from-a-museum-photo).*
 
 The agent writes a Blender script that builds the part. print3d runs it, checks
-the mesh, slices it with Bambu Studio, and tells the agent what to fix. The
-agent repeats until every check passes, then hands you the `.3mf` to open in
-Studio and print from there.
+the mesh, slices it with your printer's slicer, and tells the agent
+what to fix. The agent repeats until every check passes, then hands you the
+`.3mf` to open in the slicer and print from there.
 
 ```
-idea -> Blender script -> mesh -> checks -> slice -> .3mf -> you print from Studio
+idea -> Blender script -> mesh -> checks -> slice -> .3mf -> you print from the slicer
              ^                      |
              +---- fix the script --+
 ```
@@ -30,6 +32,7 @@ Nothing here talks to the printer.
 ## Install in Hermes
 
 You need [Blender](https://www.blender.org/download/) 4.2+,
+[ElegooSlicer](https://www.elegoo.com/pages/elegoo-slicer) or
 [Bambu Studio](https://bambulab.com/en/download/studio) and
 [uv](https://docs.astral.sh/uv/) on the same machine as Hermes. Then:
 
@@ -53,13 +56,16 @@ itself, so there is no Hermes config to edit.
 Start a new session afterwards. `hermes plugins update print3d` updates both;
 `hermes plugins remove print3d` removes both.
 
-Explicit `BLENDER_BIN` and `BAMBU_STUDIO_BIN` paths take precedence, followed by
-executables on `PATH`. On macOS, Blender and Studio are also found in
-`/Applications`. On Windows, print3d checks the Program Files directories for
-`Blender Foundation/Blender <version>/blender.exe` and
-`Bambu Studio/bambu-studio.exe`, preferring newer Blender version folders within
-each directory. Custom and portable installations can use the environment
-variables above. Jobs go to `~/print3d/jobs`, or `$PRINT3D_JOBS`.
+Explicit `BLENDER_BIN`, `ELEGOO_SLICER_BIN` and `BAMBU_STUDIO_BIN` paths take
+precedence, followed by executables on `PATH`. On macOS, Blender and the
+slicers are also found in `/Applications`. On Windows, print3d checks the
+Program Files directories for `Blender Foundation/Blender <version>/blender.exe`,
+`ElegooSlicer/elegoo-slicer.exe` and `Bambu Studio/bambu-studio.exe`, preferring
+newer Blender version folders within each directory. Custom and portable
+installations can use the environment variables above. Jobs go to
+`~/print3d/jobs`, or `$PRINT3D_JOBS`. You only need the slicer of the printer
+you [choose](#your-printer): Bambu Studio for the Bambu Lab printers,
+ElegooSlicer for the Centauri Carbons.
 
 Hermes looks for Blender 4.2+ before it installs the plugin, and refuses the
 install when there is none. It checks the usual places: `/Applications` and
@@ -111,6 +117,11 @@ print3d slices for the X2D unless you choose another printer it has presets for:
 | --- | --- | --- | --- |
 | Bambu Lab X2D | `x2d-0.4` (default) | two, 0.4 mm | 256 × 256 × 261 mm |
 | Bambu Lab P2S | `p2s-0.4` | one, 0.4 mm | 256 × 256 × 256 mm |
+| Elegoo Centauri Carbon | `elegoo-cc-0.4` | one, 0.4 mm | 256 × 256 × 256 mm |
+| Elegoo Centauri Carbon 2 | `elegoo-cc2-0.4` | one, 0.4 mm | 256 × 256 × 256 mm |
+
+The Bambu Lab printers slice in Bambu Studio, the Centauri Carbons in
+ElegooSlicer; print3d runs the one that reads the chosen printer's presets.
 
 ```bash
 print3d printer p2s-0.4      # saved in ~/print3d/printer.json
@@ -215,10 +226,10 @@ fill in and run again.
 | `coupon` | Slice the fit coupon that calibrates your printer's clearances |
 | `fit show` / `fit set` | The clearance per fit that scripts get as `params["fit"]`, and recording yours |
 | `plan model.stl out.gcode.3mf` | Show the Studio command without running it |
-| `status` | Where Blender and Studio were found, and the printer |
-| `doctor` | Probe Blender and Studio before writing a model; report paths, availability and versions |
-| `printer [x2d-0.4 \| p2s-0.4]` | Show the printer print3d slices for, or choose another |
-| `flatten [--printer <key>]` | Rebuild a printer's presets in `src/print3d/profiles/<key>/` from Studio's |
+| `status` | Where Blender and the printer's slicer were found, and the printer |
+| `doctor` | Probe Blender and the printer's slicer before writing a model; report paths, availability and versions |
+| `printer [<key>]` | Show the printer print3d slices for, or choose another (`x2d-0.4`, `p2s-0.4`, `elegoo-cc-0.4`, `elegoo-cc2-0.4`) |
+| `flatten [--printer <key>]` | Rebuild a printer's presets in `src/print3d/profiles/<key>/` from its slicer's |
 | `setup` | Register print3d with your agents |
 | `mcp` | Run the MCP server on stdio (agents launch this) |
 

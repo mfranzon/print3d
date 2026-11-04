@@ -1,11 +1,11 @@
 ---
 name: print3d
-description: Model a part in Blender from an idea, a photo of an object, or the shop listing of something you would otherwise buy, slice it for the user's Bambu Lab X2D or P2S, and iterate until it prints clean and matches the photo.
+description: Model a part in Blender from an idea, a photo of an object, or the shop listing of something you would otherwise buy, slice it for the user's Bambu Lab X2D or P2S or Elegoo Centauri Carbon or Carbon 2, and iterate until it prints clean and matches the photo.
 argument-hint: "[what to make, a photo of the object, or a shop link]"
 disable-model-invocation: true
 ---
 
-# /print3d — idea to a printable part for a Bambu X2D or P2S
+# /print3d — idea to a printable part
 
 `print3d` below is the print3d command line. When you have the print3d MCP
 tools, use those of the same names instead: they return the plate preview and
@@ -156,6 +156,11 @@ is set up for.
 | Build volume | 256 × 256 × 261 mm | 256 × 256 × 256 mm |
 | Colours | two print without a filament change | every colour after the first is an AMS filament change, with a purge and a prime tower |
 
-Both: 0.20 mm layers, Bambu PLA Basic, textured PEI plate. **The pinned
+The Elegoo Centauri Carbon (`elegoo-cc-0.4`) and Centauri Carbon 2
+(`elegoo-cc2-0.4`) are one-nozzle printers like the P2S, sliced in ElegooSlicer
+with Elegoo PLA; each colour after the first is a filament change.
+
+All: 0.20 mm layers, textured PEI plate, PLA (Bambu PLA Basic on the Bambu Lab
+printers). **The pinned
 processes have supports off** — that is why an overhang note is a real defect
 and not a setting to flip.

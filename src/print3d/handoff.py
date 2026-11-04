@@ -332,7 +332,7 @@ footer {{ margin-top:32px; color:var(--muted); font-size:12px; border-top:1px so
 {_section("Open notes", f"<ul>{notes}</ul>" if notes else "")}
 {_section("Plates", f'<div class="plates">{plate_cards}</div>')}
 {_section("Files", f"<ul>{file_list}</ul>")}
-<p class="sub">Open the <code>.3mf</code> in Bambu Studio to review and print. Each STL is one part in its print pose.</p>
+<p class="sub">Open the <code>.3mf</code> in {_esc(printer.get("slicer_name", "Bambu Studio"))} to review and print. Each STL is one part in its print pose.</p>
 <footer>Made with print3d. Nothing here was sent to a printer.</footer>
 </main></body></html>
 """

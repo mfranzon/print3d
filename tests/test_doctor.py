@@ -16,7 +16,7 @@ from print3d.studio import StudioError
 def probes(monkeypatch, tmp_path):
     monkeypatch.setattr(doctor, "SYSTEM", "Linux")
     monkeypatch.setattr(doctor, "find_blender", lambda: tmp_path / "blender")
-    monkeypatch.setattr(doctor, "find_studio", lambda: tmp_path / "studio")
+    monkeypatch.setattr(doctor, "find_slicer", lambda *_: tmp_path / "studio")
     calls = []
 
     def run(command, **kwargs):
@@ -46,11 +46,11 @@ def test_missing_dependencies_are_reported_together(probes, monkeypatch):
     def absent_blender():
         raise BlenderError("Set BLENDER_BIN")
 
-    def absent_studio():
+    def absent_studio(*_):
         raise StudioError("Set BAMBU_STUDIO_BIN")
 
     monkeypatch.setattr(doctor, "find_blender", absent_blender)
-    monkeypatch.setattr(doctor, "find_studio", absent_studio)
+    monkeypatch.setattr(doctor, "find_slicer", absent_studio)
     report = doctor.dependency_status()
     assert not report["ready"]
     assert all(check["status"] == "missing" for check in report["dependencies"].values())

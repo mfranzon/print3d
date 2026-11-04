@@ -198,3 +198,61 @@ def test_flatten_resolves_a_printers_presets(tmp_path):
 def test_flatten_refuses_a_printer_it_has_no_presets_for(tmp_path):
     with pytest.raises(FlattenError, match="p2s-0.4, x2d-0.4"):
         flatten_printer("a1-0.4", profiles_root=tmp_path, output_dir=tmp_path / "out")
+
+
+def test_the_elegoo_printers_slice_in_elegooslicer():
+    for key, name in (("elegoo-cc-0.4", "Elegoo Centauri Carbon"), ("elegoo-cc2-0.4", "Elegoo Centauri Carbon 2")):
+        printer = printers.printer_info(key)
+        assert (printer.name, printer.nozzles, printer.bed_mm) == (name, 1, (256.0, 256.0, 256.0))
+        assert (printer.slicer, printer.slicer_name, printer.supports) == ("elegoo", "ElegooSlicer", False)
+    for key in BUILT_IN:
+        assert printers.printer_info(key).slicer_name == "Bambu Studio"
+
+
+def test_a_job_slices_with_its_printers_slicer(tmp_path, cube_stl, monkeypatch):
+    monkeypatch.setenv(printers.PRINTER_ENV, "elegoo-cc-0.4")
+    report = run_job("a cube", mesh=cube_stl, execute=False, jobs_dir=tmp_path / "jobs")
+    assert report["slice_plan"]["slicer"] == "ElegooSlicer"
+    monkeypatch.setenv(printers.PRINTER_ENV, "x2d-0.4")
+    report = run_job("a cube", mesh=cube_stl, execute=False, jobs_dir=tmp_path / "jobs")
+    assert report["slice_plan"]["slicer"] == "Bambu Studio"
+
+
+def test_the_slicer_is_never_swapped_for_the_other(tmp_path, monkeypatch):
+    from print3d.studio import StudioError, find_slicer
+
+    elegoo = tmp_path / "elegoo-slicer"
+    elegoo.write_text("")
+    elegoo.chmod(0o755)
+    monkeypatch.setenv("ELEGOO_SLICER_BIN", str(elegoo))
+    assert find_slicer("elegoo") == elegoo.resolve()
+    monkeypatch.setenv("BAMBU_STUDIO_BIN", "")
+    monkeypatch.setattr("print3d.studio.find_studio", lambda search_path=None: (_ for _ in ()).throw(StudioError("none")))
+    with pytest.raises(StudioError):
+        find_slicer("bambu")
+
+
+def test_flatten_looks_only_in_the_requested_vendors_profiles(tmp_path, monkeypatch):
+    from print3d.flatten import detect_profiles_root
+
+    elegoo_root, bambu_root = tmp_path / "elegoo", tmp_path / "bambu"
+    (elegoo_root / "Elegoo" / "machine").mkdir(parents=True)
+    (bambu_root / "BBL" / "machine").mkdir(parents=True)
+    monkeypatch.setenv("ELEGOO_PROFILES_ROOT", str(elegoo_root))
+    monkeypatch.setenv("BAMBU_PROFILES_ROOT", str(bambu_root))
+    assert detect_profiles_root(vendor="Elegoo") == elegoo_root
+    assert detect_profiles_root(vendor="BBL") == bambu_root
+
+
+def test_doctor_and_the_preflight_check_the_printers_slicer(tmp_path, cube_stl, monkeypatch):
+    from print3d.doctor import discover_dependencies
+    from print3d.pipeline import PipelineError
+    from print3d.studio import StudioError
+
+    monkeypatch.setenv(printers.PRINTER_ENV, "elegoo-cc-0.4")
+    monkeypatch.setenv("ELEGOO_SLICER_BIN", "")
+    monkeypatch.setattr("print3d.studio.find_elegoo", lambda search_path=None: (_ for _ in ()).throw(StudioError("ElegooSlicer CLI not found.")))
+    studio = discover_dependencies()["studio"]
+    assert (studio["ready"], studio["message"]) == (False, "ElegooSlicer CLI not found.")
+    with pytest.raises((StudioError, PipelineError), match="ElegooSlicer"):
+        run_job("a cube", mesh=cube_stl, execute=True, jobs_dir=tmp_path / "jobs")

@@ -229,7 +229,8 @@ def cmd_setup(args: argparse.Namespace) -> int:
 def cmd_flatten(args: argparse.Namespace) -> int:
     printer = args.printer or printers.active_printer()
     output = Path(args.output) if args.output else printers.PROFILES / printer
-    _print_json(flatten_printer(printer, output_dir=output))
+    root = Path(args.profiles_root) if args.profiles_root else None
+    _print_json(flatten_printer(printer, output_dir=output, profiles_root=root))
     return 0
 
 
@@ -250,16 +251,17 @@ def cmd_status(_args: argparse.Namespace) -> int:
     paths = {name: check["path"] or f"missing: {check['message']}"
              for name, check in dependencies.items()}
     choice = printers.printer_choice()
+    printer = printers.printer_info(choice["printer"])
     _print_json(
         {
             **paths,
-            "printer": {**choice, "summary": printers.printer_info(choice["printer"]).describe()},
+            "printer": {**choice, "summary": printer.describe()},
             "profiles": str(profiles),
             "profiles_present": all(
                 (profiles / name).is_file()
                 for name in ("machine.json", "process.json", "filament.json")
             ),
-            "stops_at": "review in Bambu Studio",
+            "stops_at": f"review in {printer.slicer_name}",
         }
     )
     return 0
@@ -267,6 +269,7 @@ def cmd_status(_args: argparse.Namespace) -> int:
 
 def cmd_plan(args: argparse.Namespace) -> int:
     profiles = default_profiles_dir()
+    printer = printers.read_printer(profiles)
     output = Path(args.output)
     request = SliceRequest(
         input_mesh=Path(args.mesh),
@@ -276,6 +279,8 @@ def cmd_plan(args: argparse.Namespace) -> int:
         filaments=(profiles / "filament.json",),
         datadir=output.parent / "studio-datadir",
         output_dir=output.parent,
+        bed_type=printer.bed_type,
+        slicer=printer.slicer,
     )
     _print_json(slice_plan(request))
     return 0
@@ -283,7 +288,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="print3d", description="Idea to a reviewable Bambu Studio project for a Bambu Lab X2D or P2S"
+        prog="print3d", description="Idea to a reviewable slicer project for a Bambu Lab X2D or P2S, or an Elegoo Centauri Carbon or Carbon 2"
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
 
@@ -413,14 +418,15 @@ def build_parser() -> argparse.ArgumentParser:
     setup_cmd.add_argument("--yes", action="store_true", help="Apply without asking")
     setup_cmd.set_defaults(func=cmd_setup)
 
-    printer_cmd = sub.add_parser("printer", help="Show the Bambu Lab printer print3d slices for, or choose another")
+    printer_cmd = sub.add_parser("printer", help="Show the printer print3d slices for, or choose another")
     printer_cmd.add_argument("choose", nargs="?", help=f"One of: {', '.join(printers.available())}")
     printer_cmd.set_defaults(func=cmd_printer)
 
-    flatten_cmd = sub.add_parser("flatten", help="Rebuild a printer's pinned presets from Bambu Studio's")
+    flatten_cmd = sub.add_parser("flatten", help="Rebuild a printer's pinned presets from its slicer's")
     flatten_cmd.add_argument("--printer", choices=sorted(printers.PRESETS),
                              help="Default: the printer print3d slices for")
     flatten_cmd.add_argument("--output", help="Default: src/print3d/profiles/<printer>")
+    flatten_cmd.add_argument("--profiles-root", help="The slicer's system profiles (default: found from the install)")
     flatten_cmd.set_defaults(func=cmd_flatten)
 
     status_cmd = sub.add_parser("status", help="Show Blender, slicer and profile paths")

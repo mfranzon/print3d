@@ -1,10 +1,12 @@
-"""Which Bambu Lab printer print3d slices for, and what its presets say about it.
+"""Which printer print3d slices for, and what its presets say about it.
 
 Each printer is a folder of flattened Studio presets, profiles/<key>/ with
 machine.json, process.json and filament.json (`print3d flatten --printer <key>`
 rebuilds one). The checks read the build volume and the nozzle count from those
 presets instead of pinning one printer, so adding a printer is its folder plus
-the PRESETS entry `flatten` builds it from, not a change to the checks.
+the PRESETS entry `flatten` builds it from, not a change to the checks. The
+entry also names the slicer that reads the folder: Bambu Studio for the Bambu
+Lab printers, ElegooSlicer for the Elegoo Centauri Carbons.
 
 Choose with `print3d printer <key>` (saved in ~/print3d/printer.json), or for
 one run with $PRINT3D_PRINTER. Without either, print3d slices for the X2D, as
@@ -25,6 +27,7 @@ PROFILES = Path(__file__).resolve().parent / "profiles"
 PRINTER_ENV = "PRINT3D_PRINTER"
 DEFAULT_PRINTER = "x2d-0.4"
 DEFAULT_BED_TYPE = "Textured PEI Plate"
+SLICERS = {"bambu": "Bambu Studio", "elegoo": "ElegooSlicer"}
 
 
 @dataclass(frozen=True)
@@ -35,6 +38,10 @@ class Presets:
     process: str
     filament: str
     bed_type: str = DEFAULT_BED_TYPE
+    # The slicer that reads the flattened folder (a key of SLICERS), and the
+    # vendor tree in that slicer's system profiles the presets come from.
+    slicer: str = "bambu"
+    vendor: str = "BBL"
 
 
 PRESETS: dict[str, Presets] = {
@@ -47,6 +54,20 @@ PRESETS: dict[str, Presets] = {
         machine="Bambu Lab P2S 0.4 nozzle",
         process="0.20mm Standard @BBL P2S",
         filament="Bambu PLA Basic @BBL P2S",
+    ),
+    "elegoo-cc-0.4": Presets(
+        machine="Elegoo Centauri Carbon 0.4 nozzle",
+        process="0.20mm Standard @Elegoo CC 0.4 nozzle",
+        filament="Elegoo PLA @ECC",
+        slicer="elegoo",
+        vendor="Elegoo",
+    ),
+    "elegoo-cc2-0.4": Presets(
+        machine="Elegoo Centauri Carbon 2 0.4 nozzle",
+        process="0.20mm Standard @Elegoo CC2 0.4 nozzle",
+        filament="Elegoo PLA @ECC2",
+        slicer="elegoo",
+        vendor="Elegoo",
     ),
 }
 
@@ -65,6 +86,11 @@ class Printer:
     filament: str
     bed_type: str
     filament_cost_per_kg: float | None
+    slicer: str = "bambu"
+
+    @property
+    def slicer_name(self) -> str:
+        return SLICERS[self.slicer]
 
     def describe(self) -> str:
         """The print sheet's line: printer, nozzle, layers, filament, plate, supports."""
@@ -77,7 +103,12 @@ class Printer:
         )
 
     def as_dict(self) -> dict[str, Any]:
-        return {**asdict(self), "bed_mm": list(self.bed_mm), "summary": self.describe()}
+        return {
+        **asdict(self),
+        "bed_mm": list(self.bed_mm),
+        "slicer_name": self.slicer_name,
+        "summary": self.describe(),
+    }
 
 
 def available() -> list[str]:
@@ -161,7 +192,16 @@ def read_printer(folder: Path) -> Printer:
         filament=str(filament_ids[0]),
         bed_type=str(process.get("curr_bed_type") or DEFAULT_BED_TYPE),
         filament_cost_per_kg=_first_float(filament.get("filament_cost")),
+        slicer=_slicer_for(folder.name, machine),
     )
+
+
+def _slicer_for(key: str, machine: dict[str, Any]) -> str:
+    """The slicer for a folder: its PRESETS entry, else the vendor its machine preset names."""
+    if key in PRESETS:
+        return PRESETS[key].slicer
+    model = str(machine.get("printer_model") or machine.get("name") or "")
+    return "elegoo" if model.lower().startswith("elegoo") else "bambu"
 
 
 def printer_info(key: str | None = None) -> Printer:

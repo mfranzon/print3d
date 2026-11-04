@@ -28,21 +28,37 @@ class FlattenError(RuntimeError):
     """Raised when a profile tree cannot be flattened."""
 
 
-def detect_profiles_root(slicer_path: str | None = None) -> Path:
+def detect_profiles_root(slicer_path: str | None = None, vendor: str = "BBL") -> Path:
+    """The system profiles that hold `vendor`'s tree: BBL in Bambu Studio's, Elegoo in ElegooSlicer's."""
+    elegoo = vendor == "Elegoo"
     candidates: list[Path] = []
-    env_root = os.environ.get("BAMBU_PROFILES_ROOT", "").strip()
+    env_root = os.environ.get("ELEGOO_PROFILES_ROOT" if elegoo else "BAMBU_PROFILES_ROOT", "").strip()
     if env_root:
         candidates.append(Path(env_root).expanduser())
-    candidates.append(Path.home() / "Library/Application Support/BambuStudio/system")
+    app = "ElegooSlicer" if elegoo else "BambuStudio"
+    candidates.append(Path.home() / "Library/Application Support" / app / "system")
     if slicer_path:
         slicer = Path(slicer_path).resolve()
+        # Windows: <install>/resources/profiles; macOS: <app>/Contents/Resources/profiles.
+        for relative in ("resources", "Resources"):
+            candidates.append(slicer.parent / relative / "profiles")
         candidates.append(slicer.parent.parent / "Resources" / "profiles")
-    candidates.append(Path("/Applications/BambuStudio.app/Contents/Resources/profiles"))
+    candidates.append(Path("/Applications") / f"{app}.app" / "Contents/Resources/profiles")
+    from print3d.windows import program_files_dirs
+
+    installs = (
+        ("ElegooSlicer/resources/profiles", "ElegooSlicer/Resources/profiles")
+        if elegoo
+        else ("Bambu Studio/Resources/profiles",)
+    )
+    for root in program_files_dirs():
+        candidates.extend(root / relative for relative in installs)
     for candidate in candidates:
-        if (candidate / "BBL" / "machine").is_dir():
+        if (candidate / vendor / "machine").is_dir():
             return candidate
     raise FlattenError(
-        "Could not find Bambu Lab profiles. Set BAMBU_PROFILES_ROOT or install Bambu Studio."
+        f"Could not find the {vendor} profiles. Install "
+        + ("ElegooSlicer or set ELEGOO_PROFILES_ROOT." if elegoo else "Bambu Studio or set BAMBU_PROFILES_ROOT.")
     )
 
 
@@ -59,7 +75,9 @@ def build_name_index(profiles_root: Path, vendor: str = "BBL") -> dict[str, dict
         directory = profiles_root / vendor / kind
         if not directory.is_dir():
             continue
-        for path in directory.glob("*.json"):
+        # ElegooSlicer nests filament profiles per printer (filament/ECC/...),
+        # so walk the whole subtree.
+        for path in sorted(directory.rglob("*.json")):
             try:
                 data = load_json(path)
             except (OSError, json.JSONDecodeError, FlattenError):
@@ -243,17 +261,18 @@ def flatten_presets(
     bed_type: str = DEFAULT_BED_TYPE,
     nozzle_volume_type: str | None = None,
     slicer_path: str | None = None,
+    vendor: str = "BBL",
 ) -> dict[str, Any]:
-    root = profiles_root or detect_profiles_root(slicer_path)
+    root = profiles_root or detect_profiles_root(slicer_path, vendor)
     filaments = list(filament_leaves or [DEFAULT_FILAMENT])
-    index = build_name_index(root)
+    index = build_name_index(root, vendor)
     machine = flatten_by_name(machine_leaf, index)
     process = flatten_by_name(process_leaf, index)
     filament_profiles = [flatten_by_name(name, index) for name in filaments]
 
     derive_nozzle_volume_type(machine, nozzle_volume_type)
     apply_machine_model_bed_metadata(machine, index)
-    overlay = apply_cli_overlay(machine, root)
+    overlay = apply_cli_overlay(machine, root, vendor)
 
     normalize_for_cli(machine, "machine", machine_leaf)
     normalize_for_cli(process, "process", process_leaf)
@@ -273,7 +292,7 @@ def flatten_presets(
 
     provenance = {
         "profiles_root": _home_relative(root),
-        "profiles_version": vendor_version(root),
+        "profiles_version": vendor_version(root, vendor),
         "machine": machine_leaf,
         "process": process_leaf,
         "filaments": filaments,
@@ -305,11 +324,11 @@ def flatten_printer(
     profiles_root: Path | None = None,
     slicer_path: str | None = None,
 ) -> dict[str, Any]:
-    """Flatten the Studio presets print3d pins for `printer` (a key of printers.PRESETS)."""
+    """Flatten the slicer presets print3d pins for `printer` (a key of printers.PRESETS)."""
     presets = PRESETS.get(printer)
     if presets is None:
         raise FlattenError(
-            f"print3d does not know the Studio presets for {printer!r}. Known: {', '.join(sorted(PRESETS))}."
+            f"print3d does not know the presets for {printer!r}. Known: {', '.join(sorted(PRESETS))}."
         )
     return flatten_presets(
         profiles_root=profiles_root,
@@ -319,4 +338,5 @@ def flatten_printer(
         filament_leaves=[presets.filament],
         bed_type=presets.bed_type,
         slicer_path=slicer_path,
+        vendor=presets.vendor,
     )

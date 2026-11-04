@@ -31,9 +31,10 @@ from print3d.viewer import build_viewer
 from print3d.printability import advise, analyze_mesh, analyze_slice, dfm_advice, worst_severity
 
 INSTRUCTIONS = """\
-print3d turns an idea, or a photo of an object, into a Bambu Studio project for the
-user's Bambu Lab printer: the X2D, or the P2S (`printer` shows which one print3d
-slices for, and switches). You write a Blender (bpy) model script; `make` runs it,
+print3d turns an idea, or a photo of an object, into a sliced project for the
+user's printer: a Bambu Lab X2D or P2S (via Bambu Studio), or an Elegoo Centauri
+Carbon or Centauri Carbon 2 (via ElegooSlicer). `printer` shows which one print3d
+slices for, and switches. You write a Blender (bpy) model script; `make` runs it,
 checks the mesh against that printer, slices it and returns advice, each note with
 the fix to apply to the script. Iterate until no note is at `error`, then hand the
 user the .3mf path and name the printer in the report's `printer`.
@@ -97,7 +98,7 @@ def _with_images(payload: dict[str, Any], paths: list[str | None]) -> list[Any]:
 
 @tool(read_only=True)
 def doctor() -> str:
-    """Check Blender and Bambu Studio paths, availability and versions before writing a model.
+    """Check Blender and the printer's slicer (Bambu Studio or ElegooSlicer) before writing a model.
 
     Studio is ready when found; version detection never blocks readiness.
     Windows/macOS read metadata without launching Studio; Linux probes --help.
@@ -169,9 +170,9 @@ def fits(
 
 @tool()
 def printer(choose: str | None = None) -> str:
-    """The Bambu Lab printer print3d slices for: build volume, nozzles, presets, and the others it has.
+    """The printer print3d slices for: build volume, nozzles, slicer, presets, and the others it has.
 
-    Pass `choose` (e.g. "p2s-0.4" or "x2d-0.4") to switch; the choice is saved for every later
+    Pass `choose` (e.g. "p2s-0.4", "x2d-0.4" or "elegoo-cc-0.4") to switch; the choice is saved for every later
     job and rerun. Only switch when the user asks for a different printer.
     """
     return _json(printers.choose_printer(choose) if choose else printers.status())

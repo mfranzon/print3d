@@ -1,4 +1,10 @@
-"""Bambu Studio CLI wrapper. Isolated --datadir, dry-run first."""
+"""Slicer CLI wrapper. Isolated --datadir, dry-run first.
+
+The command line of ElegooSlicer (an OrcaSlicer fork) is flag-compatible with
+Bambu Studio's, so one wrapper drives both. The request names which one, from
+the printer's presets: each slicer only reads its own vendor's profiles, so
+there is no falling back from one to the other.
+"""
 
 from __future__ import annotations
 
@@ -6,16 +12,16 @@ import os
 import shutil
 import subprocess
 from dataclasses import dataclass
-from itertools import chain
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
+from print3d.printers import SLICERS
 from print3d.repair_3mf import repair_bambu_3mf
-from print3d.windows import studio_locations
+from print3d.windows import elegoo_locations, studio_locations
 
 
 class StudioError(RuntimeError):
-    """Raised for Studio discovery or slice failures."""
+    """Raised for slicer discovery or slice failures."""
 
 
 @dataclass(frozen=True)
@@ -34,9 +40,19 @@ class SliceRequest:
     ensure_on_bed: bool = True
     bed_type: str = "Textured PEI Plate"
     debug_level: int = 2
-    # Several parts: Studio reads the meshes, filaments and plates from this
+    # Several parts: the slicer reads the meshes, filaments and plates from this
     # file instead of from input_mesh.
     assemble_list: Path | None = None
+    # Which slicer reads the presets: a key of printers.SLICERS.
+    slicer: str = "bambu"
+
+
+def _first_file(candidates: Iterable[str | Path]) -> Path | None:
+    for candidate in candidates:
+        path = Path(candidate).expanduser()
+        if path.is_file():
+            return path.resolve()
+    return None
 
 
 def find_studio(search_path: str | None = None) -> Path:
@@ -53,11 +69,42 @@ def find_studio(search_path: str | None = None) -> Path:
             "/Applications/BambuStudio.app/Contents/MacOS/BambuStudio",
         ]
     )
-    for candidate in chain(candidates, studio_locations()):
-        path = Path(candidate).expanduser()
-        if path.is_file():
-            return path.resolve()
+    found = _first_file(candidates) or _first_file(studio_locations())
+    if found:
+        return found
     raise StudioError("Bambu Studio CLI not found. Install Bambu Studio or set BAMBU_STUDIO_BIN.")
+
+
+def find_elegoo(search_path: str | None = None) -> Path:
+    env = os.environ.get("ELEGOO_SLICER_BIN", "").strip()
+    candidates: list[str | Path] = []
+    if env:
+        candidates.append(env)
+    for name in ("elegoo-slicer", "elegoo-slicer.exe"):
+        if which := shutil.which(name, path=search_path):
+            candidates.append(which)
+            break
+    candidates.extend(
+        [
+            "/Applications/ElegooSlicer.app/Contents/MacOS/ElegooSlicer",
+            "/opt/ElegooSlicer/elegoo-slicer",
+        ]
+    )
+    found = _first_file(candidates) or _first_file(elegoo_locations())
+    if found:
+        return found
+    raise StudioError(
+        "ElegooSlicer CLI not found. Install ElegooSlicer or set ELEGOO_SLICER_BIN."
+    )
+
+
+def find_slicer(slicer: str = "bambu", search_path: str | None = None) -> Path:
+    """The CLI of `slicer` (a key of printers.SLICERS)."""
+    if slicer == "elegoo":
+        return find_elegoo(search_path)
+    if slicer == "bambu":
+        return find_studio(search_path)
+    raise StudioError(f"Unknown slicer {slicer!r}; print3d drives {', '.join(SLICERS)}.")
 
 
 def _common_prefix(studio: Path, request: SliceRequest) -> list[str]:
@@ -177,17 +224,19 @@ def slice_plan(request: SliceRequest, *, studio: Path | None = None) -> dict[str
     if binary is None:
         # A plan is only a preview; name the binary even when it is not installed.
         try:
-            binary = find_studio()
+            binary = find_slicer(request.slicer)
         except StudioError:
-            binary = Path("bambu-studio")
+            binary = Path("elegoo-slicer" if request.slicer == "elegoo" else "bambu-studio")
+    name = SLICERS[request.slicer]
     return {
         "dry_run": True,
         "studio": str(binary),
+        "slicer": name,
         "project_command": build_project_command(binary, request),
         "command": build_slice_command(binary, request),
         "request": _request_dict(request),
         "open_in_studio": str(project_3mf_path(request)),
-        "note": "Open the .3mf (not .gcode.3mf) in Bambu Studio File > Open. "
+        "note": f"Open the .3mf (not .gcode.3mf) in {name} File > Open. "
         ".gcode.3mf is a sliced print job and the Prepare tab reports no geometry.",
     }
 
@@ -199,11 +248,11 @@ def _run(command: list[str], timeout_s: float) -> subprocess.CompletedProcess[st
 def _require_file(path: Path, result: subprocess.CompletedProcess[str], label: str) -> None:
     if result.returncode != 0:
         raise StudioError(
-            f"Bambu Studio {label} failed with exit {result.returncode}.\n"
+            f"Slicer {label} failed with exit {result.returncode}.\n"
             f"stderr tail:\n{(result.stderr or result.stdout)[-4000:]}"
         )
     if not path.is_file():
-        raise StudioError(f"Studio {label} exited 0 but did not write {path}")
+        raise StudioError(f"Slicer {label} exited 0 but did not write {path}")
 
 
 def run_slice(
@@ -212,7 +261,7 @@ def run_slice(
     studio: Path | None = None,
     timeout_s: float = 180,
 ) -> dict[str, Any]:
-    binary = studio or find_studio()
+    binary = studio or find_slicer(request.slicer)
     plan = slice_plan(request, studio=binary)
     plan["dry_run"] = False
     request.datadir.mkdir(parents=True, exist_ok=True)

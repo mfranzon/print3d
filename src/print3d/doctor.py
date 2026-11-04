@@ -10,7 +10,8 @@ from typing import Any
 
 from print3d.app_version import macos_bundle_version, windows_file_version
 from print3d.blender import BlenderError, find_blender
-from print3d.studio import StudioError, find_studio
+from print3d.printers import printer_info
+from print3d.studio import StudioError, find_slicer
 
 PROBE_TIMEOUT = 5
 OUTPUT_LIMIT = 65536
@@ -19,9 +20,14 @@ SYSTEM = platform.system()
 
 
 def discover_dependencies() -> dict[str, dict[str, Any]]:
-    """Shared lookup for status and doctor; never start an application."""
+    """Shared lookup for status and doctor; never start an application.
+
+    `studio` is the slicer of the printer print3d slices for: Bambu Studio or
+    ElegooSlicer.
+    """
+    slicer = printer_info().slicer
     checks = {}
-    for name, finder in (("blender", find_blender), ("studio", find_studio)):
+    for name, finder in (("blender", find_blender), ("studio", lambda: find_slicer(slicer))):
         check: dict[str, Any] = {"path": None, "version": None, "ready": False}
         checks[name] = check
         try:
@@ -78,7 +84,7 @@ def dependency_status() -> dict[str, Any]:
                 check.update(status="unavailable", ready=False)
             continue
         version = re.search(
-            r"(?:Blender|Bambu\s*Studio|BambuStudio)[ \t-]+(?:version[ \t]+)?v?(\d+(?:\.\d+)+)",
+            r"(?:Blender|Bambu\s*Studio|BambuStudio|Elegoo\s*Slicer)[ \t-]+(?:version[ \t]+)?v?(\d+(?:\.\d+)+)",
             result.stdout + "\n" + result.stderr, re.IGNORECASE,
         )
         check.update(

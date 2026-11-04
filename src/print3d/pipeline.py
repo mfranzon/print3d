@@ -1,4 +1,4 @@
-"""Idea to a reviewable Bambu Studio project.
+"""Idea to a reviewable slicer project.
 
     prompt or photos  ->  Blender model script  ->  mesh  ->  DFM + printability
          |                    ^                                + likeness to the photos
@@ -37,7 +37,7 @@ from print3d.printability import (
 )
 from print3d.project import extract_plate_png, inspect_project
 from print3d.spec import load_spec, model_dims
-from print3d.studio import SliceRequest, assemble_list, find_studio, run_slice, slice_plan
+from print3d.studio import SliceRequest, assemble_list, find_slicer, run_slice, slice_plan
 from print3d.viewer import build_viewer
 
 MODEL_SCRIPT = "model.py"
@@ -159,10 +159,10 @@ def _run_job(
     else:
         model_script = _resolve_script(brief, job_dir, script)
 
-    # Keep scaffolding and dry runs usable without Studio. For a real run,
+    # Keep scaffolding and dry runs usable without the slicer. For a real run,
     # fail inside the report lifecycle before Blender can overwrite geometry.
     if execute:
-        find_studio()
+        find_slicer(printer.slicer)
 
     if mesh is not None:
         report["model"] = {"mesh": str(mesh_path), "source": "supplied"}
@@ -204,6 +204,8 @@ def _run_job(
         ),
         datadir=job_dir / "studio-datadir",
         output_dir=job_dir / "slice",
+        bed_type=printer.bed_type,
+        slicer=printer.slicer,
         # Auto-orient would silently rotate the part and invalidate every
         # overhang note below. Orientation is the model script's business.
         orient=False,
@@ -246,7 +248,7 @@ def _run_job(
             "next_step": (
                 "Fix the errors in the model script and run again."
                 if severity == "error"
-                else f"Open the .3mf in Bambu Studio (set up for the {printer.name}), check the preview, "
+                else f"Open the .3mf in {printer.slicer_name} (set up for the {printer.name}), check the preview, "
                 "and print it from there."
             ),
         }
@@ -379,6 +381,8 @@ def _run_parts(
         filaments=tuple(filaments),
         datadir=job_dir / "studio-datadir",
         output_dir=slice_dir,
+        bed_type=printer.bed_type,
+        slicer=printer.slicer,
         orient=False,
         assemble_list=assemble,
     )
@@ -445,7 +449,7 @@ def _run_parts(
             "next_step": (
                 "Fix the errors in the model script and run again."
                 if severity == "error"
-                else f"Open the .3mf in Bambu Studio (set up for the {printer.name}), check each plate, "
+                else f"Open the .3mf in {printer.slicer_name} (set up for the {printer.name}), check each plate, "
                 "and print from there."
             ),
         }
