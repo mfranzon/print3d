@@ -23,6 +23,7 @@ from print3d.filaments import DEFAULT_COLOUR, colour_advice, colour_hex, job_fil
 from print3d.fits import fit_advice, load_fits
 from print3d.likeness import check_likeness, likeness_advice
 from print3d.paths import default_jobs_dir, default_profiles_dir
+from print3d.plate_preview import draw_plate
 from print3d.printers import Printer, read_printer
 from print3d.printability import (
     Advice,
@@ -223,7 +224,12 @@ def _run_job(
     slice_result = run_slice(request)
     project = Path(slice_result["output_3mf"])
     inspection = inspect_project(project)
-    png = extract_plate_png(project, job_dir / "slice" / f"{brief.slug}_plate.png")
+    plate_png = job_dir / "slice" / f"{brief.slug}_plate.png"
+    png = extract_plate_png(project, plate_png)
+    if png is None:
+        # A headless CLI slice writes no Metadata/plate_N.png, so draw one from
+        # the plate JSON the slicer did write (upstream print3d issue #23).
+        png = draw_plate(project, plate_png, plate=1, build_volume_mm=printer.bed_mm)
     slice_metrics = analyze_slice(project)
     notes = advise(mesh_metrics, slice_metrics, extra=likeness_notes)
     severity = worst_severity(notes)
@@ -409,6 +415,11 @@ def _run_parts(
         on_plate = [metrics[obj["name"]] for obj in model["objects"] if obj["plate"] == index]
         notes.extend(slice_advice(metrics_, any(corroborates_layer_jump(m) for m in on_plate)))
         png = extract_plate_png(project, slice_dir / f"{brief.slug}_plate_{index}.png", plate=index)
+        if png is None:
+            png = draw_plate(
+                project, slice_dir / f"{brief.slug}_plate_{index}.png",
+                plate=index, build_volume_mm=printer.bed_mm,
+            )
         plates.append(
             {
                 "plate": index,
