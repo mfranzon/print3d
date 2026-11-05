@@ -37,6 +37,9 @@ def detect_profiles_root(slicer_path: str | None = None, vendor: str = "BBL") ->
         candidates.append(Path(env_root).expanduser())
     app = "ElegooSlicer" if elegoo else "BambuStudio"
     candidates.append(Path.home() / "Library/Application Support" / app / "system")
+    # Linux: the slicer keeps its system profiles in the user's config directory.
+    config_home = Path(os.environ.get("XDG_CONFIG_HOME", "").strip() or Path.home() / ".config")
+    candidates.append(config_home / app / "system")
     if slicer_path:
         slicer = Path(slicer_path).resolve()
         # Windows: <install>/resources/profiles; macOS: <app>/Contents/Resources/profiles.
