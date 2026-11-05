@@ -14,9 +14,11 @@ _BY = r"\s*(?:x|\u00d7|by)\s*"
 DIMS_RE = re.compile(rf"{_AXIS}{_BY}{_AXIS}(?:{_BY}{_AXIS})?(?:\s*mm)?", re.IGNORECASE)
 SAYS_RE = re.compile(
     r"""(?:says?|text|reading)\s+(?:["']([^"']{1,32})["']|([A-Za-z0-9][A-Za-z0-9._-]{0,32}))""",
-    re.I,
+    re.IGNORECASE,
 )
-COLOR_RE = re.compile(r"\b(green|pink|white|yellow|red|blue|black|orange|purple)\b", re.I)
+COLOR_RE = re.compile(
+    r"\b(green|pink|white|yellow|red|blue|black|orange|purple)\b", re.IGNORECASE
+)
 SLUG_RE = re.compile(r"[^a-z0-9]+")
 
 
@@ -42,7 +44,9 @@ def slugify(text: str, limit: int = 30) -> str:
 
 def _intent(prompt: str) -> Intent:
     lower = prompt.lower()
-    if any(word in lower for word in ("figurine", "statue", "dragon", "scan", "organic")):
+    if any(
+        word in lower for word in ("figurine", "statue", "dragon", "scan", "organic")
+    ):
         return "figurine"
     if any(word in lower for word in ("nameplate", "sign", "plaque", "says", "label")):
         return "sign"
@@ -51,7 +55,9 @@ def _intent(prompt: str) -> Intent:
     return "utility"
 
 
-def _size(prompt: str, intent: Intent) -> tuple[tuple[float, float, float] | None, list[str]]:
+def _size(
+    prompt: str, intent: Intent
+) -> tuple[tuple[float, float, float] | None, list[str]]:
     """The brief's size, plus one assumption note per axis that had to be derived.
 
     A sign brief may state every axis ("a 40mm x 8mm x 3mm nameplate", "40 x 8 x 3 mm");
@@ -68,17 +74,31 @@ def _size(prompt: str, intent: Intent) -> tuple[tuple[float, float, float] | Non
         return None, []
     first = float(matches[0].group(1))
     if intent == "sign":
-        dims = next((m for m in DIMS_RE.finditer(prompt) if "mm" in m.group(0).lower()), None)
+        dims = next(
+            (m for m in DIMS_RE.finditer(prompt) if "mm" in m.group(0).lower()), None
+        )
         size = [float(v) for v in dims.groups() if v] if dims else [first]
         assumptions: list[str] = []
         if len(size) < 2:
             size.append(round(size[0] * 0.4, 3))
             assumptions.append(
-                f"Depth not stated; used 40% of the stated width ({size[1]:g} mm).")
+                f"Depth not stated; used 40% of the stated width ({size[1]:g} mm)."
+            )
         if len(size) < 3:
             size.append(3.0)
             assumptions.append("Thickness not stated; used 3 mm.")
         return (size[0], size[1], size[2]), assumptions
+    # Any other brief that states all three axes as one dimension is that size.
+    dims = next(
+        (
+            m
+            for m in DIMS_RE.finditer(prompt)
+            if "mm" in m.group(0).lower() and m.group(3)
+        ),
+        None,
+    )
+    if dims:
+        return (float(dims.group(1)), float(dims.group(2)), float(dims.group(3))), []
     return (first, first, first), []
 
 
@@ -98,7 +118,9 @@ def parse_brief(prompt: str, *, color: str | None = None) -> PrintBrief:
         raise ValueError("Prompt is empty.")
     intent = _intent(text)
     size, size_assumptions = _size(text, intent)
-    color_name = color or (COLOR_RE.search(text).group(1).lower() if COLOR_RE.search(text) else None)
+    color_name = color or (
+        COLOR_RE.search(text).group(1).lower() if COLOR_RE.search(text) else None
+    )
     plate_text = _text(text)
     assumptions: list[str] = list(size_assumptions)
     if size is None:

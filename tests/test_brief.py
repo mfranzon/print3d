@@ -57,3 +57,24 @@ def test_sign_brief_ignores_other_mm_values():
     brief = parse_brief("a 60mm sign with 5mm letters and 4mm holes that says HALL")
     assert brief.target_size_mm == (60.0, 24.0, 3.0)
     assert any("Depth not stated" in note for note in brief.assumptions)
+
+
+def test_utility_brief_uses_every_stated_axis():
+    # A part brief that states width, depth and height must be checked against
+    # those sizes; reading only the first number turned a 60x20x4 bracket into a
+    # 60 mm cube, so a wrongly sized part could still pass the review.
+    brief = parse_brief("a wall bracket 60 x 20 x 4 mm with two screw holes")
+    assert brief.intent == "utility"
+    assert brief.target_size_mm == (60.0, 20.0, 4.0)
+    assert brief.assumptions == ()
+
+
+def test_enclosure_brief_uses_every_stated_axis():
+    brief = parse_brief("an enclosure 80mm x 50mm x 30mm for a Raspberry Pi")
+    assert brief.intent == "enclosure"
+    assert brief.target_size_mm == (80.0, 50.0, 30.0)
+
+
+def test_utility_brief_with_one_size_keeps_it_on_every_axis():
+    brief = parse_brief("a 25 mm spacer")
+    assert brief.target_size_mm == (25.0, 25.0, 25.0)
