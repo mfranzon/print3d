@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import zipfile
 from dataclasses import asdict, dataclass
@@ -194,6 +195,24 @@ def extract_plate_png(path: Path, dest: Path, plate: int = 1) -> Path | None:
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(archive.read(member))
         return dest
+
+
+def read_plate_json(path: Path, plate: int = 1) -> dict[str, Any] | None:
+    """The slicer's own plate summary: object bounding boxes and filament colours.
+
+    Both Bambu Studio and ElegooSlicer write `Metadata/plate_N.json` even when a
+    headless slice leaves no `plate_N.png` behind, so this is what a missing
+    thumbnail can be redrawn from. Anything absent or unreadable is a None.
+    """
+    member = f"Metadata/plate_{plate}.json"
+    try:
+        with zipfile.ZipFile(path.expanduser().resolve()) as archive:
+            if member not in archive.namelist():
+                return None
+            data = json.loads(archive.read(member).decode("utf-8", "replace"))
+    except (OSError, zipfile.BadZipFile, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
 
 
 def read_plate_gcode(path: Path, plate: int = 1) -> str:
