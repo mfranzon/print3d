@@ -256,3 +256,19 @@ def test_doctor_and_the_preflight_check_the_printers_slicer(tmp_path, cube_stl, 
     assert (studio["ready"], studio["message"]) == (False, "ElegooSlicer CLI not found.")
     with pytest.raises((StudioError, PipelineError), match="ElegooSlicer"):
         run_job("a cube", mesh=cube_stl, execute=True, jobs_dir=tmp_path / "jobs")
+
+
+def test_flatten_finds_the_linux_studio_profiles_in_the_config_directory(tmp_path, monkeypatch):
+    # Bambu Studio on Linux (Flatpak, AppImage, distro package) keeps its system
+    # profiles in ~/.config/BambuStudio/system; without this, flatten fails there
+    # unless BAMBU_PROFILES_ROOT is set by hand.
+    from print3d.flatten import detect_profiles_root
+
+    monkeypatch.delenv("BAMBU_PROFILES_ROOT", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    monkeypatch.setattr("print3d.windows.program_files_dirs", lambda: [])
+    root = tmp_path / "config" / "BambuStudio" / "system"
+    (root / "BBL" / "machine").mkdir(parents=True)
+    assert detect_profiles_root(vendor="BBL") == root
+
