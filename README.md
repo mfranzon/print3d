@@ -429,6 +429,14 @@ After rerunning a job, handoff requires the latest run to complete slicing.
 A failed, interrupted or dry-run attempt blocks a new handoff until another
 run completes without `--dry-run`. Existing handoff files are left in place.
 
+Project export and slicing write into separate temporary directories for each
+run. Both new archives must validate before either final output is replaced;
+an exit code of zero with no new file is an error. Slicer errors, timeouts and
+invalid archives preserve the previous outputs. Each final file is replaced
+atomically, but the two replacements are not a single filesystem transaction:
+a publication error still fails the run and blocks handoff. Temporary outputs
+are removed when the call finishes.
+
 ## What gets checked
 
 `print3d check` and the MCP `check` tool include the same structural DFM checks
