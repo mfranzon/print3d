@@ -127,6 +127,14 @@ def _parse_slice_info(slice_info: str | None) -> dict[str, Any]:
     return {"metadata": meta, "filaments": filaments, "plates": plates}
 
 
+def _plate_weight_g(parsed_info: dict[str, Any], plate: int) -> float | None:
+    """The weight of this plate only; missing weights remain unknown."""
+    for plate_info in parsed_info.get("plates", []):
+        if plate_info.get("index") == plate:
+            return plate_info.get("weight_g")
+    return None
+
+
 def inspect_project(path: Path) -> dict[str, Any]:
     resolved = path.expanduser().resolve()
     if not resolved.is_file():
@@ -159,9 +167,8 @@ def inspect_project(path: Path) -> dict[str, Any]:
                 md5_ok = expected.lower() == _md5_bytes(gcode_bytes).lower()
             png_name = f"Metadata/plate_{index}.png"
             stats = _parse_gcode_stats(gcode_text)
-            info_weight = parsed_info.get("metadata", {}).get("weight")
-            if stats["filament_g"] is None and info_weight:
-                stats["filament_g"] = float(info_weight)
+            if stats["filament_g"] is None:
+                stats["filament_g"] = _plate_weight_g(parsed_info, index)
             plates.append(
                 PlateInfo(
                     index=index,
@@ -235,7 +242,4 @@ def slice_info_weight_g(path: Path, plate: int = 1) -> float | None:
             parsed = _parse_slice_info(archive.read("Metadata/slice_info.config").decode("utf-8", "replace"))
     except (OSError, zipfile.BadZipFile):
         return None
-    for plate_info in parsed.get("plates", []):
-        if plate_info.get("index") == plate:
-            return plate_info.get("weight_g")
-    return None
+    return _plate_weight_g(parsed, plate)
