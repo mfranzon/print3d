@@ -11,12 +11,16 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
-from dataclasses import dataclass
+import tempfile
+import uuid
+import zipfile
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Iterable
 
 from print3d.printers import SLICERS
-from print3d.repair_3mf import repair_bambu_3mf
+from print3d.project import ProjectError, inspect_project
+from print3d.repair_3mf import RepairError, repair_bambu_3mf
 from print3d.windows import elegoo_locations, studio_locations
 
 
@@ -220,6 +224,8 @@ def _request_dict(request: SliceRequest) -> dict[str, Any]:
 
 
 def slice_plan(request: SliceRequest, *, studio: Path | None = None) -> dict[str, Any]:
+    if project_3mf_path(request).resolve() == request.output_3mf.resolve():
+        raise StudioError("Editable and sliced projects must have different output paths.")
     binary = studio
     if binary is None:
         # A plan is only a preview; name the binary even when it is not installed.
@@ -255,6 +261,32 @@ def _require_file(path: Path, result: subprocess.CompletedProcess[str], label: s
         raise StudioError(f"Slicer {label} exited 0 but did not write {path}")
 
 
+def _publish(source: Path, destination: Path) -> None:
+    """Replace one final file without exposing a partially copied archive."""
+    pending = destination.parent / f".print3d-{uuid.uuid4().hex}"
+    # Let the kernel apply the current umask, just as for a normal new output.
+    # O_EXCL prevents following/replacing a pre-existing pending path. Opening
+    # happens before the try so a collision never removes someone else's file.
+    descriptor = os.open(pending, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0), 0o666)
+    try:
+        with os.fdopen(descriptor, "wb") as stream, source.open("rb") as original:
+            shutil.copyfileobj(original, stream)
+        pending.replace(destination)
+    finally:
+        pending.unlink(missing_ok=True)
+
+
+def _validate_archive(path: Path, label: str, *, sliced: bool = False) -> None:
+    try:
+        repair_bambu_3mf(path)
+        if sliced:
+            inspection = inspect_project(path)
+            if any(plate["md5_ok"] is False for plate in inspection["plates"]):
+                raise StudioError("Slicer output has an invalid G-code checksum.")
+    except (zipfile.BadZipFile, RepairError, ProjectError) as exc:
+        raise StudioError(f"Slicer {label} produced an invalid archive: {exc}") from exc
+
+
 def run_slice(
     request: SliceRequest,
     *,
@@ -270,23 +302,36 @@ def run_slice(
     project = project_3mf_path(request)
     project.parent.mkdir(parents=True, exist_ok=True)
 
-    project_result = _run(build_project_command(binary, request), timeout_s)
-    exported_project = request.output_dir / project.name
-    _require_file(exported_project, project_result, "project export")
-    if exported_project.resolve() != project.resolve():
-        project.write_bytes(exported_project.read_bytes())
-    repair_bambu_3mf(project)
+    # Existing exports are never evidence of this invocation's success. Keep
+    # both stages private until both new archives have passed validation.
+    with tempfile.TemporaryDirectory(dir=request.output_dir, prefix=".print3d-") as temporary:
+        staging = Path(temporary)
+        project_dir, slice_dir = staging / "project", staging / "slice"
+        project_dir.mkdir()
+        slice_dir.mkdir()
+        exported_project = project_dir / project.name
+        exported = slice_dir / request.output_3mf.name
+        project_request = replace(request, output_dir=project_dir, output_project_3mf=exported_project)
+        slice_request = replace(request, output_dir=slice_dir, output_3mf=exported)
 
-    # Slice the STL, not the project 3mf. --load-settings on 3mf input has
-    # segfaulted Studio CLI (bambulab/BambuStudio#10402).
-    slice_cmd = build_slice_command(binary, request, input_path=request.input_mesh)
-    plan["command"] = slice_cmd
-    slice_result = _run(slice_cmd, timeout_s)
-    exported = request.output_dir / request.output_3mf.name
-    _require_file(exported, slice_result, "slice")
-    if exported.resolve() != request.output_3mf.resolve():
-        request.output_3mf.write_bytes(exported.read_bytes())
-    repair_bambu_3mf(request.output_3mf)
+        project_cmd = build_project_command(binary, project_request)
+        plan["executed_project_command"] = project_cmd
+        project_result = _run(project_cmd, timeout_s)
+        _require_file(exported_project, project_result, "project export")
+        _validate_archive(exported_project, "project export")
+
+        # Slice the STL, not the project 3mf. --load-settings on 3mf input has
+        # segfaulted Studio CLI (bambulab/BambuStudio#10402).
+        slice_cmd = build_slice_command(binary, slice_request, input_path=request.input_mesh)
+        plan["executed_command"] = slice_cmd
+        slice_result = _run(slice_cmd, timeout_s)
+        _require_file(exported, slice_result, "slice")
+        _validate_archive(exported, "slice", sliced=True)
+
+        # Each file is replaced atomically. The pair is not a filesystem
+        # transaction; the pipeline marks publication failures as failed runs.
+        _publish(exported_project, project)
+        _publish(exported, request.output_3mf)
 
     plan["returncode"] = slice_result.returncode
     plan["stdout"] = slice_result.stdout

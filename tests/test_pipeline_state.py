@@ -1,6 +1,7 @@
 """A rerun must not authorize handoff with a report from an older slice."""
 import json
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -136,3 +137,28 @@ def test_interrupted_rerun_leaves_a_non_deliverable_report(job):
     with pytest.raises(HandoffError):
         build_handoff(job_dir, render=False)
     assert json.loads((job_dir / "report.json").read_text())["status"] == "running"
+
+
+@pytest.mark.parametrize("missing_stage", ["project", "slice"])
+def test_zero_exit_without_output_cannot_reuse_previous_slice(job, monkeypatch, missing_stage):
+    from print3d import studio
+
+    job_dir, _, run = job
+    old = {path: path.read_bytes() for path in (job_dir / "slice").glob("*.3mf")}
+
+    def cli(command, timeout):
+        stage = "slice" if "--slice" in command else "project"
+        if stage != missing_stage:
+            output = Path(command[command.index("--outputdir") + 1])
+            shutil.copyfile(GOLDEN, output / command[command.index("--export-3mf") + 1])
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(studio, "_run", cli)
+    monkeypatch.setattr(studio, "find_slicer", lambda *_: Path("fixture-studio"))
+    monkeypatch.setattr(pipeline, "run_slice", studio.run_slice)
+    with pytest.raises(StudioError, match="exited 0 but did not write"):
+        run()
+    assert all(path.read_bytes() == data for path, data in old.items())
+    assert json.loads((job_dir / "report.json").read_text())["status"] == "failed"
+    with pytest.raises(HandoffError):
+        build_handoff(job_dir, render=False)
