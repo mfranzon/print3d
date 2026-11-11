@@ -435,7 +435,13 @@ an exit code of zero with no new file is an error. Slicer errors, timeouts and
 invalid archives preserve the previous outputs. Each final file is replaced
 atomically, but the two replacements are not a single filesystem transaction:
 a publication error still fails the run and blocks handoff. Temporary outputs
-are removed when the call finishes.
+are removed when the call finishes normally or unwinds an exception; a hard kill
+can leave a staging directory behind. Published files use normal creation
+permissions (`0666` filtered by the current umask on POSIX). Invalid archives
+raise `StudioError`. Reports retain `command` and `project_command` for the
+final output directory, plus `executed_command` and `executed_project_command`
+for diagnostics of the temporary staging paths. Planning and execution both
+reject coincident editable and sliced output paths.
 
 ## What gets checked
 
