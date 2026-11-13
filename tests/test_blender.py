@@ -72,3 +72,23 @@ def test_missing_tarball_patterns_report_blender_error(tmp_path, monkeypatch):
     monkeypatch.setattr("print3d.blender.blender_locations", lambda: iter(()))
     with pytest.raises(BlenderError, match="BLENDER_BIN"):
         find_blender(search_path="")
+
+
+def test_wsl_location_finds_blender_on_the_windows_side(tmp_path, monkeypatch):
+    """WSL reaches a Windows Blender through /mnt/c; discover it like a tarball install."""
+    location = "/mnt/c/Program Files/Blender Foundation/Blender*/blender.exe"
+    from print3d.blender import BLENDER_LOCATIONS
+
+    assert location in BLENDER_LOCATIONS
+    root = tmp_path / "Program Files" / "Blender Foundation"
+    for version in ("4.9", "4.10"):
+        folder = root / f"Blender {version}"
+        folder.mkdir(parents=True)
+        (folder / "blender.exe").write_bytes(b"")
+    monkeypatch.delenv("BLENDER_BIN", raising=False)
+    monkeypatch.setattr("print3d.blender.shutil.which", lambda *a, **k: None)
+    monkeypatch.setattr(
+        "print3d.blender.BLENDER_LOCATIONS", (str(root / "Blender */blender.exe"),)
+    )
+    monkeypatch.setattr("print3d.blender.blender_locations", lambda: iter(()))
+    assert find_blender(search_path="") == (root / "Blender 4.10" / "blender.exe").resolve()

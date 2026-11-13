@@ -47,6 +47,8 @@ BLENDER_LOCATIONS = (
     "~/.local/share/Steam/steamapps/common/Blender/blender",
     "~/blender-*/blender",
     "/opt/blender*/blender",
+    # WSL: Blender installed on the Windows side is reachable through /mnt/c.
+    "/mnt/c/Program Files/Blender Foundation/Blender*/blender.exe",
 )
 
 
