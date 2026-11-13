@@ -38,7 +38,9 @@ def _box_stl(path: Path, x: float, y: float, z: float) -> Path:
 
 
 def test_every_known_printer_has_its_presets_pinned():
-    assert set(printers.available()) == set(printers.PRESETS) >= set(BUILT_IN)
+    # orca-0.4 is configured (PRINT3D_ORCA_*), not pinned to a preset folder.
+    pinned = set(printers.PRESETS) - {"orca-0.4"}
+    assert set(printers.available()) == pinned >= set(BUILT_IN)
     for key in BUILT_IN:
         for name in ("machine.json", "process.json", "filament.json", "provenance.json"):
             assert (printers.PROFILES / key / name).is_file()
