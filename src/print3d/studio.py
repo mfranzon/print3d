@@ -118,6 +118,13 @@ def find_orca(search_path: str | None = None) -> Path:
             "/snap/bin/orca-slicer",
         ]
     )
+    # WSL: OrcaSlicer installed on the Windows side is reachable through /mnt/c.
+    candidates.extend(
+        [
+            "/mnt/c/Program Files/OrcaSlicer/orca-slicer.exe",
+            "/mnt/c/Program Files/OrcaSlicer/OrcaSlicer.exe",
+        ]
+    )
     found = _first_file(candidates)
     if found:
         return found
