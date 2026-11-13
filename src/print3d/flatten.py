@@ -52,8 +52,24 @@ def detect_profiles_root(slicer_path: str | None = None, vendor: str = "BBL") ->
                     slicer.parent / "resources" / "profiles" / "system",
                 ]
             )
+        # WSL: the Windows side's OrcaSlicer profiles (resources tree or APPDATA).
+        candidates.extend(
+            win_home / "resources" / "profiles"
+            for win_home in [Path("/mnt/c/Program Files/OrcaSlicer")]
+            if win_home.exists()
+        )
+        candidates.extend(
+            win_user / rel
+            for win_user in Path("/mnt/c/Users").glob("*/AppData/Roaming/OrcaSlicer")
+            for rel in (Path("system"), Path("user"))
+        )
         for candidate in candidates:
-            if (candidate / "machine").is_dir() or (candidate / "OrcaSlicer" / "machine").is_dir():
+            if (
+                (candidate / "machine").is_dir()
+                or (candidate / "OrcaSlicer" / "machine").is_dir()
+                or any(candidate.glob("*/machine"))
+                or any(candidate.glob("*/filament"))
+            ):
                 return candidate
         raise FlattenError(
             "Could not find the OrcaSlicer profiles. Install OrcaSlicer or set ORCA_PROFILES_DIR."
