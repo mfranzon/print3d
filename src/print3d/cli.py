@@ -288,7 +288,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="print3d", description="Idea to a reviewable slicer project for a Bambu Lab X2D or P2S, or an Elegoo Centauri Carbon or Carbon 2"
+        prog="print3d", description="Idea to a reviewable slicer project for a Bambu Lab X2D or P2S, an Elegoo Centauri Carbon or Carbon 2, or an OrcaSlicer printer"
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
 

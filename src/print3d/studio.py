@@ -102,10 +102,43 @@ def find_elegoo(search_path: str | None = None) -> Path:
     )
 
 
+def find_orca(search_path: str | None = None) -> Path:
+    """OrcaSlicer's CLI. Its command line is flag-compatible with Bambu Studio's."""
+    env = (os.environ.get("ORCA_SLICER_PATH") or os.environ.get("ORCA_SLICER_BIN") or "").strip()
+    candidates: list[str | Path] = [env] if env else []
+    for name in ("orca-slicer", "OrcaSlicer", "orca-slicer.exe"):
+        if which := shutil.which(name, path=search_path):
+            candidates.append(which)
+            break
+    candidates.extend(
+        [
+            "/usr/bin/orca-slicer",
+            "/usr/local/bin/orca-slicer",
+            str(Path.home() / ".local/bin/orca-slicer"),
+            "/snap/bin/orca-slicer",
+        ]
+    )
+    # WSL: OrcaSlicer installed on the Windows side is reachable through /mnt/c.
+    candidates.extend(
+        [
+            "/mnt/c/Program Files/OrcaSlicer/orca-slicer.exe",
+            "/mnt/c/Program Files/OrcaSlicer/OrcaSlicer.exe",
+        ]
+    )
+    found = _first_file(candidates)
+    if found:
+        return found
+    raise StudioError(
+        "OrcaSlicer CLI not found. Install OrcaSlicer or set ORCA_SLICER_PATH."
+    )
+
+
 def find_slicer(slicer: str = "bambu", search_path: str | None = None) -> Path:
     """The CLI of `slicer` (a key of printers.SLICERS)."""
     if slicer == "elegoo":
         return find_elegoo(search_path)
+    if slicer == "orca":
+        return find_orca(search_path)
     if slicer == "bambu":
         return find_studio(search_path)
     raise StudioError(f"Unknown slicer {slicer!r}; print3d drives {', '.join(SLICERS)}.")

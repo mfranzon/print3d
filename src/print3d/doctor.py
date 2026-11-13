@@ -22,8 +22,8 @@ SYSTEM = platform.system()
 def discover_dependencies() -> dict[str, dict[str, Any]]:
     """Shared lookup for status and doctor; never start an application.
 
-    `studio` is the slicer of the printer print3d slices for: Bambu Studio or
-    ElegooSlicer.
+    `studio` is the slicer of the printer print3d slices for: Bambu Studio,
+    ElegooSlicer or OrcaSlicer.
     """
     slicer = printer_info().slicer
     checks = {}

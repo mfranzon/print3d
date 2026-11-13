@@ -29,7 +29,51 @@ class FlattenError(RuntimeError):
 
 
 def detect_profiles_root(slicer_path: str | None = None, vendor: str = "BBL") -> Path:
-    """The system profiles that hold `vendor`'s tree: BBL in Bambu Studio's, Elegoo in ElegooSlicer's."""
+    """The system profiles that hold `vendor`'s tree: BBL in Bambu Studio's, Elegoo in ElegooSlicer's, OrcaSlicer in its own."""
+    if vendor == "OrcaSlicer":
+        candidates = [
+            Path(p).expanduser()
+            for p in os.environ.get("ORCA_PROFILES_DIR", "").split(os.pathsep)
+            if p.strip()
+        ]
+        config_home = Path(os.environ.get("XDG_CONFIG_HOME", "").strip() or Path.home() / ".config")
+        candidates.extend(
+            [
+                config_home / "OrcaSlicer" / "system",
+                config_home / "OrcaSlicer" / "user",
+                Path("/usr/share/OrcaSlicer/resources/profiles"),
+            ]
+        )
+        if slicer_path:
+            slicer = Path(slicer_path).resolve()
+            candidates.extend(
+                [
+                    slicer.parent / "resources" / "profiles",
+                    slicer.parent / "resources" / "profiles" / "system",
+                ]
+            )
+        # WSL: the Windows side's OrcaSlicer profiles (resources tree or APPDATA).
+        candidates.extend(
+            win_home / "resources" / "profiles"
+            for win_home in [Path("/mnt/c/Program Files/OrcaSlicer")]
+            if win_home.exists()
+        )
+        candidates.extend(
+            win_user / rel
+            for win_user in Path("/mnt/c/Users").glob("*/AppData/Roaming/OrcaSlicer")
+            for rel in (Path("system"), Path("user"))
+        )
+        for candidate in candidates:
+            if (
+                (candidate / "machine").is_dir()
+                or (candidate / "OrcaSlicer" / "machine").is_dir()
+                or any(candidate.glob("*/machine"))
+                or any(candidate.glob("*/filament"))
+            ):
+                return candidate
+        raise FlattenError(
+            "Could not find the OrcaSlicer profiles. Install OrcaSlicer or set ORCA_PROFILES_DIR."
+        )
     elegoo = vendor == "Elegoo"
     candidates: list[Path] = []
     env_root = os.environ.get("ELEGOO_PROFILES_ROOT" if elegoo else "BAMBU_PROFILES_ROOT", "").strip()
@@ -73,6 +117,15 @@ def load_json(path: Path) -> dict[str, Any]:
 
 
 def build_name_index(profiles_root: Path, vendor: str = "BBL") -> dict[str, dict[str, Any]]:
+    if vendor == "OrcaSlicer":
+        # OrcaSlicer's tree nests per vendor/printer; index every JSON preset by
+        # its file name so `inherits` can resolve within the same tree.
+        index: dict[str, dict[str, Any]] = {}
+        for path in sorted(profiles_root.rglob("*.json")):
+            if not any(kind in path.parts for kind in ("machine", "process", "filament")):
+                continue
+            index.setdefault(path.stem, load_json(path))
+        return index
     index: dict[str, dict[str, Any]] = {}
     for kind in ("machine", "process", "filament"):
         directory = profiles_root / vendor / kind
@@ -267,7 +320,13 @@ def flatten_presets(
     vendor: str = "BBL",
 ) -> dict[str, Any]:
     root = profiles_root or detect_profiles_root(slicer_path, vendor)
-    filaments = list(filament_leaves or [DEFAULT_FILAMENT])
+    filaments = list(filament_leaves or ([DEFAULT_FILAMENT] if vendor != "OrcaSlicer" else []))
+    if vendor == "OrcaSlicer" and not (machine_leaf and process_leaf and all(filaments)):
+        raise FlattenError(
+            "OrcaSlicer names its profiles per printer. Set PRINT3D_ORCA_MACHINE, "
+            "PRINT3D_ORCA_PROCESS and PRINT3D_ORCA_FILAMENT for your printer, or add "
+            "a PRESETS entry whose names exist in the OrcaSlicer profile tree."
+        )
     index = build_name_index(root, vendor)
     machine = flatten_by_name(machine_leaf, index)
     process = flatten_by_name(process_leaf, index)
@@ -279,6 +338,8 @@ def flatten_presets(
 
     normalize_for_cli(machine, "machine", machine_leaf)
     normalize_for_cli(process, "process", process_leaf)
+    if vendor == "OrcaSlicer":
+        machine["print3d_slicer"] = "orca"
     for name, filament in zip(filaments, filament_profiles, strict=True):
         normalize_for_cli(filament, "filament", name)
         ensure_machine_in_compat(filament, machine_leaf)
