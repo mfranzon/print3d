@@ -137,6 +137,26 @@ On the P2S every colour after the first is a filament change through the AMS,
 with a purge each time and a prime tower beside the part, so a multi-colour
 part takes more time and filament than on the X2D.
 
+## OrcaSlicer
+
+Bambu Studio and ElegooSlicer stay the pinned slicers. OrcaSlicer is a third,
+configured slicer: its profiles are named per printer (for example
+`0.20mm Standard @<printer>`), so print3d cannot pin them in advance. Set the
+three profile names of your printer, then use it like any other printer:
+
+```bash
+export PRINT3D_ORCA_MACHINE="<your OrcaSlicer machine preset>"
+export PRINT3D_ORCA_PROCESS="<your OrcaSlicer process preset>"
+export PRINT3D_ORCA_FILAMENT="<your OrcaSlicer filament preset>"
+print3d flatten --printer orca-0.4
+print3d printer orca-0.4
+```
+
+OrcaSlicer's CLI is flag-compatible with Bambu Studio's (`--load-settings`,
+`--load-filaments`, `--slice`, `--export-3mf`), so the same slice path drives
+it. Point print3d at the executable with `ORCA_SLICER_PATH` and at the profile
+tree with `ORCA_PROFILES_DIR`.
+
 ## What it runs and reaches
 
 - **Local programs:** Blender, to run the model scripts the agent writes and to

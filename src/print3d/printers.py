@@ -27,7 +27,13 @@ PROFILES = Path(__file__).resolve().parent / "profiles"
 PRINTER_ENV = "PRINT3D_PRINTER"
 DEFAULT_PRINTER = "x2d-0.4"
 DEFAULT_BED_TYPE = "Textured PEI Plate"
-SLICERS = {"bambu": "Bambu Studio", "elegoo": "ElegooSlicer"}
+SLICERS = {"bambu": "Bambu Studio", "elegoo": "ElegooSlicer", "orca": "OrcaSlicer"}
+
+# OrcaSlicer names its profiles per printer ("0.20mm Standard @<printer>"), so
+# print3d cannot pin them in PRESETS: set these for your printer.
+ORCA_MACHINE_ENV = "PRINT3D_ORCA_MACHINE"
+ORCA_PROCESS_ENV = "PRINT3D_ORCA_PROCESS"
+ORCA_FILAMENT_ENV = "PRINT3D_ORCA_FILAMENT"
 
 
 @dataclass(frozen=True)
@@ -68,6 +74,15 @@ PRESETS: dict[str, Presets] = {
         filament="Elegoo PLA @ECC2",
         slicer="elegoo",
         vendor="Elegoo",
+    ),
+    # OrcaSlicer: the three profile names come from the installed OrcaSlicer
+    # profile tree (per printer); empty here means "set PRINT3D_ORCA_*".
+    "orca-0.4": Presets(
+        machine=os.environ.get(ORCA_MACHINE_ENV, "").strip(),
+        process=os.environ.get(ORCA_PROCESS_ENV, "").strip(),
+        filament=os.environ.get(ORCA_FILAMENT_ENV, "").strip(),
+        slicer="orca",
+        vendor="OrcaSlicer",
     ),
 }
 
@@ -197,11 +212,18 @@ def read_printer(folder: Path) -> Printer:
 
 
 def _slicer_for(key: str, machine: dict[str, Any]) -> str:
-    """The slicer for a folder: its PRESETS entry, else the vendor its machine preset names."""
+    """The slicer for a folder: its PRESETS entry, a written marker, else the vendor its machine preset names."""
     if key in PRESETS:
         return PRESETS[key].slicer
+    marker = str(machine.get("print3d_slicer", "")).strip().lower()
+    if marker in SLICERS:
+        return marker
     model = str(machine.get("printer_model") or machine.get("name") or "")
-    return "elegoo" if model.lower().startswith("elegoo") else "bambu"
+    if model.lower().startswith("elegoo"):
+        return "elegoo"
+    if model.lower().startswith("orca"):
+        return "orca"
+    return "bambu"
 
 
 def printer_info(key: str | None = None) -> Printer:
