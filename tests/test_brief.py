@@ -60,9 +60,9 @@ def test_sign_brief_ignores_other_mm_values():
 
 
 def test_utility_brief_uses_every_stated_axis():
-    # A part brief that states width, depth and height must be checked against
-    # those sizes; reading only the first number turned a 60x20x4 bracket into a
-    # 60 mm cube, so a wrongly sized part could still pass the review.
+    # A part brief that states width, depth and height sets the target size on
+    # all three axes; reading only the first number turned a 60x20x4 bracket into
+    # a 60 mm cube in the starter script and the model params.
     brief = parse_brief("a wall bracket 60 x 20 x 4 mm with two screw holes")
     assert brief.intent == "utility"
     assert brief.target_size_mm == (60.0, 20.0, 4.0)
