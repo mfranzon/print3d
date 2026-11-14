@@ -2,7 +2,7 @@
 
 A [Hermes Agent](https://github.com/NousResearch/hermes-agent) plugin that turns
 an idea, a photo of an object, or the shop listing of something you would
-otherwise buy into a sliced print project for a **Bambu Lab X2D or P2S (0.4 mm
+otherwise buy into a sliced print project for a **Bambu Lab X2D, P2S or X1 Carbon (0.4 mm
 nozzle, via Bambu Studio)** or an **Elegoo Centauri Carbon or Centauri Carbon 2
 (0.4 mm nozzle, via ElegooSlicer)**. One part or several, in one colour or two,
 with fits measured against your own printer, a 3D view to turn the result around
@@ -117,6 +117,7 @@ print3d slices for the X2D unless you choose another printer it has presets for:
 | --- | --- | --- | --- |
 | Bambu Lab X2D | `x2d-0.4` (default) | two, 0.4 mm | 256 × 256 × 261 mm |
 | Bambu Lab P2S | `p2s-0.4` | one, 0.4 mm | 256 × 256 × 256 mm |
+| Bambu Lab X1 Carbon | `x1c-0.4` | one, 0.4 mm | 256 × 256 × 250 mm |
 | Elegoo Centauri Carbon | `elegoo-cc-0.4` | one, 0.4 mm | 256 × 256 × 256 mm |
 | Elegoo Centauri Carbon 2 | `elegoo-cc2-0.4` | one, 0.4 mm | 256 × 256 × 256 mm |
 
@@ -133,7 +134,7 @@ advice and the print sheet read the chosen printer's presets, and every report
 names the printer it sliced for. A choice that names a printer print3d has no
 presets for is an error, never a quiet fall back to the X2D.
 
-On the P2S every colour after the first is a filament change through the AMS,
+On the P2S and the X1 Carbon every colour after the first is a filament change through the AMS,
 with a purge each time and a prime tower beside the part, so a multi-colour
 part takes more time and filament than on the X2D.
 
@@ -228,7 +229,7 @@ fill in and run again.
 | `plan model.stl out.gcode.3mf` | Show the Studio command without running it |
 | `status` | Where Blender and the printer's slicer were found, and the printer |
 | `doctor` | Probe Blender and the printer's slicer before writing a model; report paths, availability and versions |
-| `printer [<key>]` | Show the printer print3d slices for, or choose another (`x2d-0.4`, `p2s-0.4`, `elegoo-cc-0.4`, `elegoo-cc2-0.4`) |
+| `printer [<key>]` | Show the printer print3d slices for, or choose another (`x2d-0.4`, `p2s-0.4`, `x1c-0.4`, `elegoo-cc-0.4`, `elegoo-cc2-0.4`) |
 | `flatten [--printer <key>]` | Rebuild a printer's presets in `src/print3d/profiles/<key>/` from its slicer's |
 | `setup` | Register print3d with your agents |
 | `mcp` | Run the MCP server on stdio (agents launch this) |
@@ -380,7 +381,7 @@ Replay it with `pytest tests/test_bracket_benchmark.py`; rebuild the media with
 Most things worth designing are more than one solid. Model every part where it
 sits when assembled, name it, and say how it turns to print. The run checks each
 printed object on its own, measures the gaps between parts, gives each colour its
-own filament (on the X2D's two nozzles, or through the P2S's AMS), and slices all
+own filament (on the X2D's two nozzles, or through the AMS of the P2S or X1 Carbon), and slices all
 of it into one project.
 
 ```python

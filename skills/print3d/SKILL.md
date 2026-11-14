@@ -1,6 +1,6 @@
 ---
 name: print3d
-description: Model a part in Blender from an idea, a photo of an object, or the shop listing of something you would otherwise buy, slice it for the user's Bambu Lab X2D or P2S or Elegoo Centauri Carbon or Carbon 2, and iterate until it prints clean and matches the photo.
+description: Model a part in Blender from an idea, a photo of an object, or the shop listing of something you would otherwise buy, slice it for the user's Bambu Lab X2D, P2S or X1 Carbon or Elegoo Centauri Carbon or Carbon 2, and iterate until it prints clean and matches the photo.
 argument-hint: "[what to make, a photo of the object, or a shop link]"
 disable-model-invocation: true
 ---
@@ -150,14 +150,14 @@ owns another: `printer(choose="p2s-0.4")`. The choice is saved. Every `make`
 report names the printer in `printer`; tell the user which printer the `.3mf`
 is set up for.
 
-| | X2D (`x2d-0.4`, the default) | P2S (`p2s-0.4`) |
-| --- | --- | --- |
-| Nozzles | two, 0.4 mm | one, 0.4 mm |
-| Build volume | 256 × 256 × 261 mm | 256 × 256 × 256 mm |
-| Colours | two print without a filament change | every colour after the first is an AMS filament change, with a purge and a prime tower |
+| | X2D (`x2d-0.4`, the default) | P2S (`p2s-0.4`) | X1C (`x1c-0.4`) |
+| --- | --- | --- | --- |
+| Nozzles | two, 0.4 mm | one, 0.4 mm | one, 0.4 mm |
+| Build volume | 256 × 256 × 261 mm | 256 × 256 × 256 mm | 256 × 256 × 250 mm |
+| Colours | two print without a filament change | every colour after the first is an AMS filament change, with a purge and a prime tower | like the P2S |
 
 The Elegoo Centauri Carbon (`elegoo-cc-0.4`) and Centauri Carbon 2
-(`elegoo-cc2-0.4`) are one-nozzle printers like the P2S, sliced in ElegooSlicer
+(`elegoo-cc2-0.4`) are one-nozzle printers like the P2S and X1C, sliced in ElegooSlicer
 with Elegoo PLA; each colour after the first is a filament change.
 
 All: 0.20 mm layers, textured PEI plate, PLA (Bambu PLA Basic on the Bambu Lab

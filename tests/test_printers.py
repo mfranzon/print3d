@@ -15,7 +15,7 @@ from print3d.handoff import job_printer
 from print3d.paths import default_profiles_dir
 from print3d.pipeline import run_job
 
-BUILT_IN = ("x2d-0.4", "p2s-0.4")
+BUILT_IN = ("x2d-0.4", "p2s-0.4", "x1c-0.4")
 
 
 @pytest.fixture(autouse=True)
@@ -55,12 +55,13 @@ def test_the_presets_say_what_each_printer_is():
         assert printer.filament.startswith("Bambu PLA Basic @BBL")
 
 
-def test_the_p2s_presets_are_flat_and_belong_together():
-    folder = printers.PROFILES / "p2s-0.4"
+@pytest.mark.parametrize("key", BUILT_IN)
+def test_the_bambu_presets_are_flat_and_belong_together(key):
+    folder = printers.PROFILES / key
     machine, process, filament = (
         json.loads((folder / f"{kind}.json").read_text()) for kind in ("machine", "process", "filament")
     )
-    presets = printers.PRESETS["p2s-0.4"]
+    presets = printers.PRESETS[key]
     assert machine["printer_settings_id"] == presets.machine
     assert process["print_settings_id"] == presets.process
     assert filament["filament_settings_id"] == [presets.filament]

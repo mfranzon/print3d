@@ -3,7 +3,7 @@
 Colour is the only thing that changes: the material stays the pinned Bambu PLA
 Basic, so every check and the slice keep meaning the same thing. On the X2D,
 Studio puts the first two filaments on its two nozzles; a third or more is
-swapped in on one of them, with a purge per change. The P2S has one nozzle, so
+swapped in on one of them, with a purge per change. The P2S and X1C have one nozzle, so
 every colour after the first is such a swap, through the AMS.
 """
 
