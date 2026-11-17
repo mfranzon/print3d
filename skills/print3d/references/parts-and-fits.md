@@ -44,8 +44,8 @@ all the placement a part needs. Studio arranges the objects on each plate.
 
 The X2D has two nozzles: two colours print without a filament change. A third
 colour is swapped in on one of them, with a purge each time; the run says so.
-The P2S has one nozzle: every colour after the first is a filament change
-through the AMS, with a purge each time and a prime tower beside the part; the
+The P2S and the A1 have one nozzle: every colour after the first is a filament
+change through the AMS, with a purge each time and a prime tower beside the part; the
 run says so too. Colour never changes the material: every filament is the
 pinned Bambu PLA Basic in another colour.
 

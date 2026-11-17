@@ -1,4 +1,4 @@
-# Modelling in Blender for a Bambu X2D or P2S
+# Modelling in Blender for a Bambu X2D, P2S or A1
 
 Recipes and gotchas for writing `jobs/<slug>/model.py`. The contract itself is
 in `SKILL.md`; this is what to reach for once you are writing geometry.
