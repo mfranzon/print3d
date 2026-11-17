@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "print3d"
 version = "0.2.0"
-description = "Idea to a reviewable Bambu Studio project for a Bambu Lab X2D, P2S or X1 Carbon"
+description = "Idea to a reviewable Bambu Studio project for a Bambu Lab X2D, P2S, X1 Carbon or A1"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = ["Pillow>=10.1,<14", "mcp>=2.0,<3"]

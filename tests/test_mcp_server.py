@@ -36,12 +36,13 @@ def test_every_cli_step_is_a_tool():
 def test_the_printer_tool_shows_and_switches(monkeypatch):
     monkeypatch.delenv("PRINT3D_PRINTER", raising=False)
     shown, chosen, refused = _call(("printer", {}), ("printer", {"choose": "p2s-0.4"}),
-                                   ("printer", {"choose": "a1-0.4"}))
+                                   ("printer", {"choose": "a1mini-0.4"}))
     assert json.loads(shown.content[0].text)["printer"] == "x2d-0.4"
     info = json.loads(chosen.content[0].text)["info"]
     assert (info["name"], info["nozzles"], info["bed_mm"]) == ("Bambu Lab P2S", 1, [256.0, 256.0, 256.0])
     assert refused.is_error
-    assert "p2s-0.4" in refused.content[0].text
+    assert "a1mini-0.4" in refused.content[0].text
+    assert "a1-0.4" in refused.content[0].text
 
 
 @pytest.mark.parametrize("topic", GUIDES)
