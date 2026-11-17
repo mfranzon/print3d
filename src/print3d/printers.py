@@ -55,6 +55,11 @@ PRESETS: dict[str, Presets] = {
         process="0.20mm Standard @BBL P2S",
         filament="Bambu PLA Basic @BBL P2S",
     ),
+    "a1-0.4": Presets(
+        machine="Bambu Lab A1 0.4 nozzle",
+        process="0.20mm Standard @BBL A1",
+        filament="Bambu PLA Basic @BBL A1",
+    ),
     "elegoo-cc-0.4": Presets(
         machine="Elegoo Centauri Carbon 0.4 nozzle",
         process="0.20mm Standard @Elegoo CC 0.4 nozzle",
