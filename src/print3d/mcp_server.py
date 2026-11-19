@@ -32,7 +32,7 @@ from print3d.printability import advise, analyze_mesh, analyze_slice, dfm_advice
 
 INSTRUCTIONS = """\
 print3d turns an idea, or a photo of an object, into a sliced project for the
-user's printer: a Bambu Lab X2D or P2S (via Bambu Studio), or an Elegoo Centauri
+user's printer: a Bambu Lab X2D, P2S or X1 Carbon (via Bambu Studio), or an Elegoo Centauri
 Carbon or Centauri Carbon 2 (via ElegooSlicer). `printer` shows which one print3d
 slices for, and switches. You write a Blender (bpy) model script; `make` runs it,
 checks the mesh against that printer, slices it and returns advice, each note with
@@ -172,7 +172,7 @@ def fits(
 def printer(choose: str | None = None) -> str:
     """The printer print3d slices for: build volume, nozzles, slicer, presets, and the others it has.
 
-    Pass `choose` (e.g. "p2s-0.4", "x2d-0.4" or "elegoo-cc-0.4") to switch; the choice is saved for every later
+    Pass `choose` (e.g. "p2s-0.4", "x2d-0.4", "x1c-0.4" or "elegoo-cc-0.4") to switch; the choice is saved for every later
     job and rerun. Only switch when the user asks for a different printer.
     """
     return _json(printers.choose_printer(choose) if choose else printers.status())

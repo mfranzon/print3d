@@ -15,7 +15,7 @@ from print3d.handoff import job_printer
 from print3d.paths import default_profiles_dir
 from print3d.pipeline import run_job
 
-BUILT_IN = ("x2d-0.4", "p2s-0.4")
+BUILT_IN = ("x2d-0.4", "p2s-0.4", "x1c-0.4")
 
 
 @pytest.fixture(autouse=True)
@@ -55,12 +55,13 @@ def test_the_presets_say_what_each_printer_is():
         assert printer.filament.startswith("Bambu PLA Basic @BBL")
 
 
-def test_the_p2s_presets_are_flat_and_belong_together():
-    folder = printers.PROFILES / "p2s-0.4"
+@pytest.mark.parametrize("key", BUILT_IN)
+def test_the_bambu_presets_are_flat_and_belong_together(key):
+    folder = printers.PROFILES / key
     machine, process, filament = (
         json.loads((folder / f"{kind}.json").read_text()) for kind in ("machine", "process", "filament")
     )
-    presets = printers.PRESETS["p2s-0.4"]
+    presets = printers.PRESETS[key]
     assert machine["printer_settings_id"] == presets.machine
     assert process["print_settings_id"] == presets.process
     assert filament["filament_settings_id"] == [presets.filament]
@@ -102,7 +103,7 @@ def test_a_saved_choice_sticks_and_the_environment_overrides_it(own_printer_choi
 
 @pytest.mark.parametrize("key", ["a1-0.4", "../x2d-0.4", "x2d-0.4/..", "X2D-0.4", "p2s"])
 def test_an_unknown_printer_is_refused(key, own_printer_choice, monkeypatch):
-    with pytest.raises(ValueError, match="p2s-0.4, x2d-0.4"):
+    with pytest.raises(ValueError, match="p2s-0.4, x1c-0.4, x2d-0.4"):
         printers.choose_printer(key)
     assert not own_printer_choice.exists()
     monkeypatch.setenv(printers.PRINTER_ENV, key)
@@ -196,7 +197,7 @@ def test_flatten_resolves_a_printers_presets(tmp_path):
 
 
 def test_flatten_refuses_a_printer_it_has_no_presets_for(tmp_path):
-    with pytest.raises(FlattenError, match="p2s-0.4, x2d-0.4"):
+    with pytest.raises(FlattenError, match="p2s-0.4, x1c-0.4, x2d-0.4"):
         flatten_printer("a1-0.4", profiles_root=tmp_path, output_dir=tmp_path / "out")
 
 
@@ -272,3 +273,9 @@ def test_flatten_finds_the_linux_studio_profiles_in_the_config_directory(tmp_pat
     (root / "BBL" / "machine").mkdir(parents=True)
     assert detect_profiles_root(vendor="BBL") == root
 
+def test_the_x1c_slices_with_one_nozzle_on_its_own_bed():
+    # The X1C has one nozzle and Studio's 256 x 256 x 250 mm printable volume, so
+    # the checks must not apply the X2D's two nozzles or its build height to it.
+    printer = printers.printer_info("x1c-0.4")
+    assert (printer.name, printer.nozzles, printer.slicer) == ("Bambu Lab X1 Carbon", 1, "bambu")
+    assert printer.bed_mm == (256.0, 256.0, 250.0)
