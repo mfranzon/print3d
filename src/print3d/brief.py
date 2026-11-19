@@ -79,6 +79,12 @@ def _size(prompt: str, intent: Intent) -> tuple[tuple[float, float, float] | Non
             size.append(3.0)
             assumptions.append("Thickness not stated; used 3 mm.")
         return (size[0], size[1], size[2]), assumptions
+    # Any other brief that states all three axes as one dimension is that size.
+    dims = next(
+        (m for m in DIMS_RE.finditer(prompt) if "mm" in m.group(0).lower() and m.group(3)), None
+    )
+    if dims:
+        return (float(dims.group(1)), float(dims.group(2)), float(dims.group(3))), []
     return (first, first, first), []
 
 
