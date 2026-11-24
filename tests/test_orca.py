@@ -137,6 +137,10 @@ def test_flatten_presets_orca(tmp_path, monkeypatch):
         slicer="orca",
     )
     machine = json.loads(Path(result["machine_path"]).read_text(encoding="utf-8"))
+    process = json.loads(Path(result["process_path"]).read_text(encoding="utf-8"))
+    assert "inherits" not in machine  # OrcaSlicer CLI cannot resolve user inherits
+    assert "inherits" not in process
+    assert "inherits" not in json.loads(Path(result["filament_paths"][0]).read_text())
     assert machine["print3d_slicer"] == "orca"
     assert Path(result["process_path"]).is_file()
     assert Path(result["filament_paths"][0]).is_file()

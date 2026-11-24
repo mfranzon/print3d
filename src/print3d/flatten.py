@@ -277,7 +277,9 @@ def ensure_machine_in_compat(flat: dict[str, Any], machine_leaf: str) -> None:
         printers.append(machine_leaf)
 
 
-def normalize_for_cli(flat: dict[str, Any], kind: ProfileKind, leaf_name: str) -> None:
+def normalize_for_cli(
+    flat: dict[str, Any], kind: ProfileKind, leaf_name: str, *, keep_inherits: bool = True
+) -> None:
     if kind == "machine":
         flat["printer_settings_id"] = leaf_name
     elif kind == "process":
@@ -286,7 +288,13 @@ def normalize_for_cli(flat: dict[str, Any], kind: ProfileKind, leaf_name: str) -
         flat["filament_settings_id"] = [leaf_name]
     for key in ("instantiation", "setting_id", "is_custom_defined", "include"):
         flat.pop(key, None)
-    flat["inherits"] = leaf_name
+    if keep_inherits:
+        flat["inherits"] = leaf_name
+    else:
+        # OrcaSlicer's CLI cannot resolve a preset whose `inherits` names a
+        # user preset (OrcaSlicer/OrcaSlicer#15604). The profile is already
+        # flattened, so there is nothing to inherit at CLI time.
+        flat.pop("inherits", None)
     flat["from"] = "User"
     flat["name"] = leaf_name
     flat["type"] = kind
@@ -345,12 +353,13 @@ def flatten_presets(
     apply_machine_model_bed_metadata(machine, index)
     overlay = apply_cli_overlay(machine, root, vendor)
 
-    normalize_for_cli(machine, "machine", machine_leaf)
-    normalize_for_cli(process, "process", process_leaf)
-    if slicer == "orca" or vendor == "OrcaSlicer":
+    is_orca = slicer == "orca" or vendor == "OrcaSlicer"
+    normalize_for_cli(machine, "machine", machine_leaf, keep_inherits=not is_orca)
+    normalize_for_cli(process, "process", process_leaf, keep_inherits=not is_orca)
+    if is_orca:
         machine["print3d_slicer"] = "orca"
     for name, filament in zip(filaments, filament_profiles, strict=True):
-        normalize_for_cli(filament, "filament", name)
+        normalize_for_cli(filament, "filament", name, keep_inherits=not is_orca)
         ensure_machine_in_compat(filament, machine_leaf)
     ensure_machine_in_compat(process, machine_leaf)
     process["curr_bed_type"] = bed_type

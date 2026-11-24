@@ -59,6 +59,71 @@ def _first_file(candidates: Iterable[str | Path]) -> Path | None:
     return None
 
 
+def _windows_slicer(binary: Path) -> bool:
+    """A Windows executable launched from WSL (its paths are not Linux paths)."""
+    return str(binary).lower().endswith(".exe") and str(binary).startswith("/mnt/")
+
+
+def _arg_path(value: str | Path, binary: Path) -> str:
+    """A path as the slicer process sees it: WSL mounts become Windows drives."""
+    text = str(value)
+    if _windows_slicer(binary) and text.startswith("/mnt/"):
+        drive, _, rest = text[5:].partition("/")
+        return f"{drive.upper()}:/{rest}"
+    return text
+
+
+def _stage_windows_request(request: SliceRequest, binary: Path) -> SliceRequest:
+    """Make the presets and datadir readable by a Windows slicer launched from WSL.
+
+    The package profiles live under the WSL home, which the Windows binary
+    cannot open. Copy them into a Windows-visible datadir and give OrcaSlicer
+    the `system` bundle directory it expects there.
+    """
+    datadir = request.datadir
+    if not str(datadir).startswith("/mnt/"):
+        candidate = next(
+            (
+                root / "AppData" / "Local" / "Temp"
+                for root in sorted(Path("/mnt/c/Users").glob("*"))
+                if (root / "AppData" / "Local" / "Temp").is_dir()
+            ),
+            None,
+        )
+        if candidate is None:
+            raise StudioError(
+                "A Windows slicer needs its job under /mnt/<drive> (set PRINT3D_JOBS to a Windows path)."
+            )
+        datadir = candidate / f"print3d-{uuid.uuid4().hex}"
+    for path in (request.input_mesh, request.output_dir, request.output_3mf):
+        if not str(path).startswith("/mnt/"):
+            raise StudioError(
+                f"A Windows slicer cannot use {path}; put the job under /mnt/<drive> "
+                "(set PRINT3D_JOBS to a Windows path)."
+            )
+    if request.assemble_list is not None and not str(request.assemble_list).startswith("/mnt/"):
+        raise StudioError("A Windows slicer needs the assemble list under /mnt/<drive>.")
+    return _copy_presets_to(request, datadir)
+
+
+def _copy_presets_to(request: SliceRequest, datadir: Path) -> SliceRequest:
+    presets = datadir / "presets"
+    presets.mkdir(parents=True, exist_ok=True)
+
+    def copy(path: Path, name: str) -> Path:
+        target = presets / name
+        shutil.copy2(path, target)
+        return target
+
+    return replace(
+        request,
+        datadir=datadir,
+        machine=copy(request.machine, "machine.json"),
+        process=copy(request.process, "process.json"),
+        filaments=tuple(copy(path, f"filament-{index}.json") for index, path in enumerate(request.filaments)),
+    )
+
+
 def find_studio(search_path: str | None = None) -> Path:
     env = os.environ.get("BAMBU_STUDIO_BIN", "").strip()
     candidates: list[str | Path] = []
@@ -145,12 +210,12 @@ def find_slicer(slicer: str = "bambu", search_path: str | None = None) -> Path:
 
 
 def _common_prefix(studio: Path, request: SliceRequest) -> list[str]:
-    filaments = ";".join(str(path.resolve()) for path in request.filaments)
-    settings = f"{request.machine.resolve()};{request.process.resolve()}"
+    filaments = ";".join(_arg_path(path.resolve(), studio) for path in request.filaments)
+    settings = ";".join(_arg_path(path.resolve(), studio) for path in (request.machine, request.process))
     command = [
         str(studio),
         "--datadir",
-        str(request.datadir.resolve()),
+        _arg_path(request.datadir.resolve(), studio),
         "--debug",
         str(request.debug_level),
     ]
@@ -172,16 +237,16 @@ def _common_prefix(studio: Path, request: SliceRequest) -> list[str]:
             "--curr-bed-type",
             request.bed_type,
             "--outputdir",
-            str(request.output_dir.resolve()),
+            _arg_path(request.output_dir.resolve(), studio),
         ]
     )
     return command
 
 
-def _models(request: SliceRequest, input_path: Path | None = None) -> list[str]:
+def _models(request: SliceRequest, studio: Path, input_path: Path | None = None) -> list[str]:
     if request.assemble_list is not None:
-        return ["--load-assemble-list", str(request.assemble_list.resolve())]
-    return [str((input_path or request.input_mesh).resolve())]
+        return ["--load-assemble-list", _arg_path(request.assemble_list.resolve(), studio)]
+    return [_arg_path((input_path or request.input_mesh).resolve(), studio)]
 
 
 def assemble_list(objects: list[dict[str, Any]]) -> dict[str, Any]:
@@ -222,7 +287,7 @@ def build_project_command(studio: Path, request: SliceRequest) -> list[str]:
     """Export an unsliced Studio project. File > Open this in the Prepare tab."""
     command = _common_prefix(studio, request)
     command.extend(["--export-3mf", project_3mf_path(request).name])
-    command.extend(_models(request))
+    command.extend(_models(request, studio))
     return command
 
 
@@ -236,7 +301,7 @@ def build_slice_command(studio: Path, request: SliceRequest, *, input_path: Path
             request.output_3mf.name,
         ]
     )
-    command.extend(_models(request, input_path))
+    command.extend(_models(request, studio, input_path))
     return command
 
 
@@ -329,6 +394,12 @@ def run_slice(
     binary = studio or find_slicer(request.slicer)
     plan = slice_plan(request, studio=binary)
     plan["dry_run"] = False
+    if _windows_slicer(binary):
+        request = _stage_windows_request(request, binary)
+        plan["request"] = _request_dict(request)
+    if request.slicer == "orca":
+        # OrcaSlicer's CLI resolves presets against a bundle under the datadir.
+        (request.datadir / "system").mkdir(parents=True, exist_ok=True)
     request.datadir.mkdir(parents=True, exist_ok=True)
     request.output_dir.mkdir(parents=True, exist_ok=True)
     request.output_3mf.parent.mkdir(parents=True, exist_ok=True)
