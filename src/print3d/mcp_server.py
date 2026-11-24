@@ -32,8 +32,9 @@ from print3d.printability import advise, analyze_mesh, analyze_slice, dfm_advice
 
 INSTRUCTIONS = """\
 print3d turns an idea, or a photo of an object, into a sliced project for the
-user's printer: a Bambu Lab X2D, P2S or X1 Carbon (via Bambu Studio), or an Elegoo Centauri
-Carbon or Centauri Carbon 2 (via ElegooSlicer). `printer` shows which one print3d
+user's printer: a Bambu Lab X2D, P2S or X1 Carbon (via Bambu Studio), an Elegoo Centauri
+Carbon or Centauri Carbon 2 (via ElegooSlicer), or a configured OrcaSlicer printer
+(`orca-0.4`, after `print3d flatten --printer orca-0.4`). `printer` shows which one print3d
 slices for, and switches. You write a Blender (bpy) model script; `make` runs it,
 checks the mesh against that printer, slices it and returns advice, each note with
 the fix to apply to the script. Iterate until no note is at `error`, then hand the
@@ -98,7 +99,7 @@ def _with_images(payload: dict[str, Any], paths: list[str | None]) -> list[Any]:
 
 @tool(read_only=True)
 def doctor() -> str:
-    """Check Blender and the printer's slicer (Bambu Studio or ElegooSlicer) before writing a model.
+    """Check Blender and the printer's slicer (Bambu Studio, ElegooSlicer or OrcaSlicer) before writing a model.
 
     Studio is ready when found; version detection never blocks readiness.
     Windows/macOS read metadata without launching Studio; Linux probes --help.

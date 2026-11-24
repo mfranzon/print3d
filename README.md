@@ -121,6 +121,9 @@ print3d slices for the X2D unless you choose another printer it has presets for:
 | Elegoo Centauri Carbon | `elegoo-cc-0.4` | one, 0.4 mm | 256 × 256 × 256 mm |
 | Elegoo Centauri Carbon 2 | `elegoo-cc2-0.4` | one, 0.4 mm | 256 × 256 × 256 mm |
 
+`orca-0.4` is not in this table: an OrcaSlicer printer is configured and gets
+its folder with `print3d flatten` first ([below](#orcaslicer)).
+
 The Bambu Lab printers slice in Bambu Studio, the Centauri Carbons in
 ElegooSlicer; print3d runs the one that reads the chosen printer's presets.
 
@@ -141,22 +144,45 @@ part takes more time and filament than on the X2D.
 ## OrcaSlicer
 
 Bambu Studio and ElegooSlicer stay the pinned slicers. OrcaSlicer is a third,
-configured slicer: its profiles are named per printer (for example
-`0.20mm Standard @<printer>`), so print3d cannot pin them in advance. Set the
-three profile names of your printer, then use it like any other printer:
+*configured* slicer: its profiles are named per printer (for example
+`0.20mm Standard @<printer>`), so print3d cannot ship a preset folder for it.
+The flow is **name → flatten → choose → slice**:
 
-```bash
-export PRINT3D_ORCA_MACHINE="<your OrcaSlicer machine preset>"
-export PRINT3D_ORCA_PROCESS="<your OrcaSlicer process preset>"
-export PRINT3D_ORCA_FILAMENT="<your OrcaSlicer filament preset>"
-print3d flatten --printer orca-0.4
-print3d printer orca-0.4
-```
+1. Point print3d at the executable and at one profile tree. `ORCA_PROFILES_DIR`
+   is the directory that contains a folder of `machine/`, `process/` and
+   `filament/` presets; `PRINT3D_ORCA_VENDOR` names that folder (default
+   `OrcaSlicer`). Only that folder is indexed, so a same-named preset in a
+   different vendor tree or in `user/` cannot be picked by accident.
+
+2. Name the three presets of your printer. These are the exact `name` fields
+   used by `inherits`, not file names:
+
+   ```bash
+   export ORCA_SLICER_PATH="/path/to/orca-slicer"   # or orca-slicer on PATH
+   export ORCA_PROFILES_DIR="/path/to/OrcaSlicer/system"
+   export PRINT3D_ORCA_VENDOR="OrcaSlicer"          # folder inside ORCA_PROFILES_DIR
+   export PRINT3D_ORCA_MACHINE="<your machine preset>"
+   export PRINT3D_ORCA_PROCESS="<your process preset>"
+   export PRINT3D_ORCA_FILAMENT="<your filament preset>"
+   ```
+
+3. Flatten them into a printer folder, then choose it. Until this step
+   `orca-0.4` is **not** in `print3d printer`'s list and choosing it is an
+   error — print3d refuses a printer it has no presets for:
+
+   ```bash
+   print3d flatten --printer orca-0.4   # writes src/print3d/profiles/orca-0.4/
+   print3d printer orca-0.4             # now it can be chosen
+   print3d slice part.stl out.gcode.3mf
+   ```
+
+   `flatten` writes complete presets (`from: User`, no `include`) and a
+   `provenance.json` with the three preset names it resolved, so the sliced
+   job can be traced back to them. Re-run `flatten` after changing a preset.
 
 OrcaSlicer's CLI is flag-compatible with Bambu Studio's (`--load-settings`,
 `--load-filaments`, `--slice`, `--export-3mf`), so the same slice path drives
-it. Point print3d at the executable with `ORCA_SLICER_PATH` and at the profile
-tree with `ORCA_PROFILES_DIR`.
+it. On WSL, a Windows-side OrcaSlicer is found under `/mnt/c/Program Files`.
 
 ## What it runs and reaches
 
@@ -249,8 +275,8 @@ fill in and run again.
 | `plan model.stl out.gcode.3mf` | Show the Studio command without running it |
 | `status` | Where Blender and the printer's slicer were found, and the printer |
 | `doctor` | Probe Blender and the printer's slicer before writing a model; report paths, availability and versions |
-| `printer [<key>]` | Show the printer print3d slices for, or choose another (`x2d-0.4`, `p2s-0.4`, `x1c-0.4`, `elegoo-cc-0.4`, `elegoo-cc2-0.4`) |
-| `flatten [--printer <key>]` | Rebuild a printer's presets in `src/print3d/profiles/<key>/` from its slicer's |
+| `printer [<key>]` | Show the printer print3d slices for, or choose another (`x2d-0.4`, `p2s-0.4`, `x1c-0.4`, `elegoo-cc-0.4`, `elegoo-cc2-0.4`, and `orca-0.4` once flattened) |
+| `flatten [--printer <key>]` | Rebuild a printer's presets in `src/print3d/profiles/<key>/` from its slicer's; for `orca-0.4` this creates the folder that makes the printer choosable |
 | `setup` | Register print3d with your agents |
 | `mcp` | Run the MCP server on stdio (agents launch this) |
 

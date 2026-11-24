@@ -8,6 +8,11 @@ the PRESETS entry `flatten` builds it from, not a change to the checks. The
 entry also names the slicer that reads the folder: Bambu Studio for the Bambu
 Lab printers, ElegooSlicer for the Elegoo Centauri Carbons.
 
+Pinned printers ship their folder. A configured printer (orca-0.4) is different:
+OrcaSlicer names its presets per printer, so the user names them, flattens them
+into profiles/<key>/, and only then can the printer be chosen. PRESETS holds the
+pinned printers only; configured_presets() builds the rest when called.
+
 Choose with `print3d printer <key>` (saved in ~/print3d/printer.json), or for
 one run with $PRINT3D_PRINTER. Without either, print3d slices for the X2D, as
 it always has. A choice that names a printer print3d has no presets for is an
@@ -30,10 +35,11 @@ DEFAULT_BED_TYPE = "Textured PEI Plate"
 SLICERS = {"bambu": "Bambu Studio", "elegoo": "ElegooSlicer", "orca": "OrcaSlicer"}
 
 # OrcaSlicer names its profiles per printer ("0.20mm Standard @<printer>"), so
-# print3d cannot pin them in PRESETS: set these for your printer.
+# print3d cannot pin them in PRESETS: set these for your printer, then flatten.
 ORCA_MACHINE_ENV = "PRINT3D_ORCA_MACHINE"
 ORCA_PROCESS_ENV = "PRINT3D_ORCA_PROCESS"
 ORCA_FILAMENT_ENV = "PRINT3D_ORCA_FILAMENT"
+ORCA_VENDOR_ENV = "PRINT3D_ORCA_VENDOR"
 
 
 @dataclass(frozen=True)
@@ -80,16 +86,29 @@ PRESETS: dict[str, Presets] = {
         slicer="elegoo",
         vendor="Elegoo",
     ),
-    # OrcaSlicer: the three profile names come from the installed OrcaSlicer
-    # profile tree (per printer); empty here means "set PRINT3D_ORCA_*".
-    "orca-0.4": Presets(
-        machine=os.environ.get(ORCA_MACHINE_ENV, "").strip(),
-        process=os.environ.get(ORCA_PROCESS_ENV, "").strip(),
-        filament=os.environ.get(ORCA_FILAMENT_ENV, "").strip(),
-        slicer="orca",
-        vendor="OrcaSlicer",
-    ),
 }
+
+
+def configured_presets() -> dict[str, Presets]:
+    """Presets the user must name before `flatten` can create the printer folder.
+
+    Read at call time, not import time: the names depend on the printer the user
+    configured and on which OrcaSlicer profile tree is selected.
+    """
+    return {
+        "orca-0.4": Presets(
+            machine=os.environ.get(ORCA_MACHINE_ENV, "").strip(),
+            process=os.environ.get(ORCA_PROCESS_ENV, "").strip(),
+            filament=os.environ.get(ORCA_FILAMENT_ENV, "").strip(),
+            slicer="orca",
+            vendor=os.environ.get(ORCA_VENDOR_ENV, "").strip() or "OrcaSlicer",
+        )
+    }
+
+
+def all_presets() -> dict[str, Presets]:
+    """Pinned presets plus the configured ones print3d knows how to flatten."""
+    return {**PRESETS, **configured_presets()}
 
 
 @dataclass(frozen=True)
@@ -218,8 +237,9 @@ def read_printer(folder: Path) -> Printer:
 
 def _slicer_for(key: str, machine: dict[str, Any]) -> str:
     """The slicer for a folder: its PRESETS entry, a written marker, else the vendor its machine preset names."""
-    if key in PRESETS:
-        return PRESETS[key].slicer
+    presets = all_presets().get(key)
+    if presets is not None:
+        return presets.slicer
     marker = str(machine.get("print3d_slicer", "")).strip().lower()
     if marker in SLICERS:
         return marker
