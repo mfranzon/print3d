@@ -70,8 +70,11 @@ ElegooSlicer for the Centauri Carbons.
 Hermes looks for Blender 4.2+ before it installs the plugin, and refuses the
 install when there is none. It checks the usual places: `/Applications` and
 Steam on macOS; `PATH`, flatpak, snap, Steam, `~/blender-*/blender` and
-`/opt/blender*/blender` on Linux; the uninstall registry
-and Program Files on Windows. If Blender is uninstalled later, Hermes hides the
+`/opt/blender*/blender` on Linux; `/mnt/<drive>/Program Files/Blender
+Foundation/Blender */blender.exe` (and per-user installs under
+`/mnt/<drive>/Users/…/AppData/Local/Programs`) when running under WSL; the
+uninstall registry and Program Files on Windows. WSL arguments are translated
+with `wslpath -w`, so a Windows Blender can open scripts and write results. If Blender is uninstalled later, Hermes hides the
 print3d tools and asks you to install it again. A Blender it cannot find there,
 such as a tarball unpacked outside those locations and reached only through
 `BLENDER_BIN`, needs the

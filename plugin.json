@@ -39,7 +39,9 @@
                 "~/.steam/steam/steamapps/common/Blender/blender",
                 "~/.local/share/Steam/steamapps/common/Blender/blender",
                 "~/blender-*/blender",
-                "/opt/blender*/blender"
+                "/opt/blender*/blender",
+                "/mnt/*/Program Files/Blender Foundation/Blender */blender.exe",
+                "/mnt/*/Users/*/AppData/Local/Programs/Blender Foundation/Blender */blender.exe"
               ]
             }
           },
