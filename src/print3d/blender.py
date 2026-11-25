@@ -31,8 +31,15 @@ from print3d.windows import blender_locations
 BLENDER_ENV = "BLENDER_BIN"
 DEFAULT_TIMEOUT = 600
 
-# macOS and Linux locations from plugin.json; Windows Program Files locations
-# are expanded at runtime by blender_locations(). Custom installs can use BLENDER_BIN.
+# Linux, macOS and WSL locations mirror plugin.json and README.md:73. Windows
+# Program Files locations are expanded at runtime by blender_locations();
+# /mnt/* covers every WSL drive. Custom installs can use BLENDER_BIN. The
+# space in "Blender */" also matches "Blender Launcher"; the version filter
+# below excludes non-version folders while explicit overrides stay honoured.
+_WSL_BLENDER_LOCATIONS = (
+    "/mnt/*/Program Files/Blender Foundation/Blender */blender.exe",
+    "/mnt/*/Users/*/AppData/Local/Programs/Blender Foundation/Blender */blender.exe",
+)
 BLENDER_LOCATIONS = (
     "/Applications/Blender.app/Contents/MacOS/Blender",
     "~/Applications/Blender.app/Contents/MacOS/Blender",
@@ -47,13 +54,39 @@ BLENDER_LOCATIONS = (
     "~/.local/share/Steam/steamapps/common/Blender/blender",
     "~/blender-*/blender",
     "/opt/blender*/blender",
-    # WSL: Blender installed on the Windows side is reachable through /mnt/c.
-    "/mnt/c/Program Files/Blender Foundation/Blender*/blender.exe",
-)
+) + _WSL_BLENDER_LOCATIONS
 
 
 class BlenderError(RuntimeError):
     """Raised when Blender is missing or a model script fails."""
+
+
+# bearbeitet mit Hilfe von coding-bot-public mit nous/tencent/hy4-flash:free — 2026-11-24
+_WSL_EXE_RE = re.compile(r"^/mnt/[A-Za-z]/.+\.[Ee][Xx][Ee]$")
+
+
+def _is_wsl_windows_exe(binary: Path) -> bool:
+    """A Windows .exe reached through a WSL drivemount needs translated args."""
+    return bool(_WSL_EXE_RE.match(str(binary)))
+
+
+def _wsl_windows_path(path: Path) -> str:
+    """Translate a Linux path to the Windows form expected by blender.exe."""
+    try:
+        result = subprocess.run(
+            ["wslpath", "-w", str(path)], capture_output=True, text=True, check=True
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise BlenderError(
+            f"Cannot translate {path} for a Windows Blender: wslpath failed. "
+            f"Set {BLENDER_ENV} to a Linux Blender instead."
+        ) from exc
+    return result.stdout.strip()
+
+
+def blender_arg(binary: Path, path: Path) -> str:
+    """Render a path as an argv value for `binary` (WSL needs Windows strings)."""
+    return _wsl_windows_path(path) if _is_wsl_windows_exe(binary) else str(path)
 
 
 def find_blender(search_path: str | None = None) -> Path:
@@ -69,7 +102,8 @@ def find_blender(search_path: str | None = None) -> Path:
         path = Path(candidate).expanduser()
         # Hermes expands '*' in declared paths and tries higher versions first.
         # Escape other glob metacharacters, including those in the home directory.
-        if "*" in str(path):
+        expanded_glob = "*" in str(path)
+        if expanded_glob:
             pattern = "*".join(glob.escape(part) for part in str(path).split("*"))
             matches = sorted(
                 (Path(match) for match in glob.glob(pattern)),
@@ -80,6 +114,13 @@ def find_blender(search_path: str | None = None) -> Path:
         else:
             matches = [path]
         for match in matches:
+            # "Blender Launcher" and similar folders are not versioned installs.
+            # Only glob candidates are filtered; an explicit BLENDER_BIN/PATH
+            # override must be honoured even if its folder name has no digit.
+            if expanded_glob and match.parent.name.startswith("Blender ") and not re.match(
+                r"^Blender \d", match.parent.name
+            ):
+                continue
             if match.is_file():
                 return match.resolve()
     raise BlenderError(
@@ -441,7 +482,8 @@ def run_model_script(
     out_mesh = out_mesh.expanduser().resolve()
     out_mesh.parent.mkdir(parents=True, exist_ok=True)
     binary = blender or find_blender()
-
+    # WSL interop does not translate argv: a Windows blender.exe needs Windows
+    # paths, while we keep reading the result via its Linux path.
     # Beside the output, not in /tmp: a flatpak Blender sees the home folder but not the host's /tmp.
     with tempfile.TemporaryDirectory(prefix=".blender-", dir=out_mesh.parent) as tmp:
         harness = Path(tmp) / "harness.py"
@@ -454,12 +496,12 @@ def run_model_script(
             "--python-exit-code",
             "5",
             "--python",
-            str(harness),
+            blender_arg(binary, harness),
             "--",
-            str(script),
-            str(out_mesh),
+            blender_arg(binary, script),
+            blender_arg(binary, out_mesh),
             json.dumps(params or {}),
-            str(result_path),
+            blender_arg(binary, result_path),
         ]
         try:
             completed = subprocess.run(

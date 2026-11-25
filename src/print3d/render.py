@@ -12,7 +12,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from print3d.blender import BlenderError, _tail, find_blender
+from print3d.blender import BlenderError, _tail, blender_arg, find_blender
 
 # Runs inside Blender's own Python, which cannot import print3d.
 _RENDER = r'''
@@ -107,9 +107,12 @@ def render_parts(
         script.write_text(_RENDER, encoding="utf-8")
         command = [
             str(binary), "--background", "--factory-startup", "--python-exit-code", "5",
-            "--python", str(script), "--",
-            json.dumps([{**item, "stl": str(Path(item["stl"]).resolve())} for item in items]),
-            str(out_png), str(size[0]), str(size[1]), str(explode),
+            "--python", blender_arg(binary, script), "--",
+            json.dumps([
+                {**item, "stl": blender_arg(binary, Path(item["stl"]).resolve())}
+                for item in items
+            ]),
+            blender_arg(binary, out_png), str(size[0]), str(size[1]), str(explode),
         ]
         try:
             done = subprocess.run(command, capture_output=True, text=True, timeout=timeout, check=False)
