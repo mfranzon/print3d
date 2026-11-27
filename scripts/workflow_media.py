@@ -22,7 +22,7 @@ from PIL import Image, ImageDraw, ImageFont
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "src"), str(ROOT / "tests")]
 
-from print3d.blender import find_blender  # noqa: E402
+from print3d.blender import blender_arg, find_blender  # noqa: E402
 from print3d.photo import grid, open_upright  # noqa: E402
 from print3d.pipeline import run_job  # noqa: E402
 from test_peg_benchmark import BENCH, CATALOGUE, build_spec  # noqa: E402
@@ -143,9 +143,10 @@ def turntable(mesh: Path, out: Path, frames: int, reach: float = 2.3, rise: floa
     out.mkdir(parents=True, exist_ok=True)
     script = out / "turntable.py"
     script.write_text(TURNTABLE, encoding="utf-8")
+    binary = find_blender()
     subprocess.run(
-        [str(find_blender()), "--background", "--factory-startup", "--python", str(script),
-         "--", str(mesh), str(out), str(frames), str(reach), str(rise)],
+        [str(binary), "--background", "--factory-startup", "--python", blender_arg(binary, script),
+         "--", blender_arg(binary, mesh), blender_arg(binary, out), str(frames), str(reach), str(rise)],
         check=True, capture_output=True,
     )
     return sorted(out.glob("turn_*.png"))
