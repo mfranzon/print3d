@@ -1,4 +1,4 @@
-# Modelling in Blender for a Bambu X2D, P2S or X1 Carbon
+# Modelling in Blender for a Bambu X2D, P2S, X1 Carbon or A1
 
 Recipes and gotchas for writing `jobs/<slug>/model.py`. The contract itself is
 in `SKILL.md`; this is what to reach for once you are writing geometry.
