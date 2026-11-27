@@ -12,7 +12,7 @@ import re
 from pathlib import Path
 from typing import Any, Iterable, Literal
 
-from print3d.printers import DEFAULT_BED_TYPE, DEFAULT_PRINTER, PRESETS
+from print3d.printers import DEFAULT_BED_TYPE, DEFAULT_PRINTER, PRESETS, all_presets
 
 ProfileKind = Literal["machine", "process", "filament"]
 META_SKIP = {"inherits", "include", "instantiation", "setting_id", "is_custom_defined"}
@@ -28,8 +28,52 @@ class FlattenError(RuntimeError):
     """Raised when a profile tree cannot be flattened."""
 
 
-def detect_profiles_root(slicer_path: str | None = None, vendor: str = "BBL") -> Path:
-    """The system profiles that hold `vendor`'s tree: BBL in Bambu Studio's, Elegoo in ElegooSlicer's."""
+def detect_profiles_root(
+    slicer_path: str | None = None, vendor: str = "BBL", slicer: str = "bambu"
+) -> Path:
+    """The profiles root that holds `vendor`'s tree: BBL in Bambu Studio's, Elegoo in ElegooSlicer's, an OrcaSlicer profile folder in its own."""
+    if slicer == "orca" or vendor == "OrcaSlicer":
+        candidates = [
+            Path(p).expanduser()
+            for p in os.environ.get("ORCA_PROFILES_DIR", "").split(os.pathsep)
+            if p.strip()
+        ]
+        config_home = Path(os.environ.get("XDG_CONFIG_HOME", "").strip() or Path.home() / ".config")
+        candidates.extend(
+            [
+                config_home / "OrcaSlicer" / "system",
+                config_home / "OrcaSlicer" / "user",
+                Path("/usr/share/OrcaSlicer/resources/profiles"),
+            ]
+        )
+        if slicer_path:
+            slicer_exe = Path(slicer_path).resolve()
+            candidates.extend(
+                [
+                    slicer_exe.parent / "resources" / "profiles",
+                    slicer_exe.parent / "resources" / "profiles" / "system",
+                ]
+            )
+        # WSL: the Windows side's OrcaSlicer profiles (resources tree or APPDATA).
+        candidates.extend(
+            win_home / "resources" / "profiles"
+            for win_home in [Path("/mnt/c/Program Files/OrcaSlicer")]
+            if win_home.exists()
+        )
+        candidates.extend(
+            win_user / rel
+            for win_user in Path("/mnt/c/Users").glob("*/AppData/Roaming/OrcaSlicer")
+            for rel in (Path("system"), Path("user"))
+        )
+        for candidate in candidates:
+            # Only the configured vendor's tree counts: another vendor's (or a
+            # user/ backup) preset with the same name must not be picked here.
+            tree = candidate if vendor in ("", ".") else candidate / vendor
+            if (tree / "machine").is_dir() and (tree / "process").is_dir():
+                return candidate
+        raise FlattenError(
+            "Could not find the OrcaSlicer profiles. Install OrcaSlicer or set ORCA_PROFILES_DIR."
+        )
     elegoo = vendor == "Elegoo"
     candidates: list[Path] = []
     env_root = os.environ.get("ELEGOO_PROFILES_ROOT" if elegoo else "BAMBU_PROFILES_ROOT", "").strip()
@@ -41,11 +85,11 @@ def detect_profiles_root(slicer_path: str | None = None, vendor: str = "BBL") ->
     config_home = Path(os.environ.get("XDG_CONFIG_HOME", "").strip() or Path.home() / ".config")
     candidates.append(config_home / app / "system")
     if slicer_path:
-        slicer = Path(slicer_path).resolve()
+        slicer_exe = Path(slicer_path).resolve()
         # Windows: <install>/resources/profiles; macOS: <app>/Contents/Resources/profiles.
         for relative in ("resources", "Resources"):
-            candidates.append(slicer.parent / relative / "profiles")
-        candidates.append(slicer.parent.parent / "Resources" / "profiles")
+            candidates.append(slicer_exe.parent / relative / "profiles")
+        candidates.append(slicer_exe.parent.parent / "Resources" / "profiles")
     candidates.append(Path("/Applications") / f"{app}.app" / "Contents/Resources/profiles")
     from print3d.windows import program_files_dirs
 
@@ -73,21 +117,38 @@ def load_json(path: Path) -> dict[str, Any]:
 
 
 def build_name_index(profiles_root: Path, vendor: str = "BBL") -> dict[str, dict[str, Any]]:
+    """Presets of one vendor's tree, keyed by the `name` `inherits` resolves against.
+
+    Only `profiles_root/<vendor>/{machine,process,filament}` is walked: another
+    vendor's tree, a user/ backup or an installed plugin's library may contain
+    presets with the same name, and picking the first one silently would slice
+    with the wrong profile. A conflicting duplicate inside the tree is an error.
+    """
     index: dict[str, dict[str, Any]] = {}
+    sources: dict[str, Path] = {}
+    tree = profiles_root if vendor in ("", ".") else profiles_root / vendor
     for kind in ("machine", "process", "filament"):
-        directory = profiles_root / vendor / kind
+        directory = tree / kind
         if not directory.is_dir():
             continue
-        # ElegooSlicer nests filament profiles per printer (filament/ECC/...),
-        # so walk the whole subtree.
+        # ElegooSlicer and OrcaSlicer nest printer profiles below the kind folder.
         for path in sorted(directory.rglob("*.json")):
             try:
                 data = load_json(path)
             except (OSError, json.JSONDecodeError, FlattenError):
                 continue
             name = data.get("name")
-            if isinstance(name, str) and name and name not in index:
-                index[name] = data
+            if not isinstance(name, str) or not name:
+                continue
+            if name in index:
+                if index[name] == data:
+                    continue
+                raise FlattenError(
+                    f"Two {kind} presets are named {name!r}: {sources[name]} and {path}. "
+                    "Select one vendor's profile tree with ORCA_PROFILES_DIR / PRINT3D_ORCA_VENDOR."
+                )
+            index[name] = data
+            sources[name] = path
     return index
 
 
@@ -216,7 +277,9 @@ def ensure_machine_in_compat(flat: dict[str, Any], machine_leaf: str) -> None:
         printers.append(machine_leaf)
 
 
-def normalize_for_cli(flat: dict[str, Any], kind: ProfileKind, leaf_name: str) -> None:
+def normalize_for_cli(
+    flat: dict[str, Any], kind: ProfileKind, leaf_name: str, *, keep_inherits: bool = True
+) -> None:
     if kind == "machine":
         flat["printer_settings_id"] = leaf_name
     elif kind == "process":
@@ -225,7 +288,13 @@ def normalize_for_cli(flat: dict[str, Any], kind: ProfileKind, leaf_name: str) -
         flat["filament_settings_id"] = [leaf_name]
     for key in ("instantiation", "setting_id", "is_custom_defined", "include"):
         flat.pop(key, None)
-    flat["inherits"] = leaf_name
+    if keep_inherits:
+        flat["inherits"] = leaf_name
+    else:
+        # OrcaSlicer's CLI cannot resolve a preset whose `inherits` names a
+        # user preset (OrcaSlicer/OrcaSlicer#15604). The profile is already
+        # flattened, so there is nothing to inherit at CLI time.
+        flat.pop("inherits", None)
     flat["from"] = "User"
     flat["name"] = leaf_name
     flat["type"] = kind
@@ -265,9 +334,16 @@ def flatten_presets(
     nozzle_volume_type: str | None = None,
     slicer_path: str | None = None,
     vendor: str = "BBL",
+    slicer: str = "bambu",
 ) -> dict[str, Any]:
-    root = profiles_root or detect_profiles_root(slicer_path, vendor)
-    filaments = list(filament_leaves or [DEFAULT_FILAMENT])
+    root = profiles_root or detect_profiles_root(slicer_path, vendor, slicer)
+    filaments = list(filament_leaves or ([DEFAULT_FILAMENT] if vendor != "OrcaSlicer" else []))
+    if (slicer == "orca" or vendor == "OrcaSlicer") and not (machine_leaf and process_leaf and all(filaments)):
+        raise FlattenError(
+            "OrcaSlicer names its profiles per printer. Set PRINT3D_ORCA_MACHINE, "
+            "PRINT3D_ORCA_PROCESS and PRINT3D_ORCA_FILAMENT for your printer, or add "
+            "a pinned PRESETS entry whose names exist in the OrcaSlicer profile tree."
+        )
     index = build_name_index(root, vendor)
     machine = flatten_by_name(machine_leaf, index)
     process = flatten_by_name(process_leaf, index)
@@ -277,10 +353,13 @@ def flatten_presets(
     apply_machine_model_bed_metadata(machine, index)
     overlay = apply_cli_overlay(machine, root, vendor)
 
-    normalize_for_cli(machine, "machine", machine_leaf)
-    normalize_for_cli(process, "process", process_leaf)
+    is_orca = slicer == "orca" or vendor == "OrcaSlicer"
+    normalize_for_cli(machine, "machine", machine_leaf, keep_inherits=not is_orca)
+    normalize_for_cli(process, "process", process_leaf, keep_inherits=not is_orca)
+    if is_orca:
+        machine["print3d_slicer"] = "orca"
     for name, filament in zip(filaments, filament_profiles, strict=True):
-        normalize_for_cli(filament, "filament", name)
+        normalize_for_cli(filament, "filament", name, keep_inherits=not is_orca)
         ensure_machine_in_compat(filament, machine_leaf)
     ensure_machine_in_compat(process, machine_leaf)
     process["curr_bed_type"] = bed_type
@@ -327,11 +406,11 @@ def flatten_printer(
     profiles_root: Path | None = None,
     slicer_path: str | None = None,
 ) -> dict[str, Any]:
-    """Flatten the slicer presets print3d pins for `printer` (a key of printers.PRESETS)."""
-    presets = PRESETS.get(printer)
+    """Flatten the pinned or configured presets print3d knows for `printer`."""
+    presets = all_presets().get(printer)
     if presets is None:
         raise FlattenError(
-            f"print3d does not know the presets for {printer!r}. Known: {', '.join(sorted(PRESETS))}."
+            f"print3d does not know the presets for {printer!r}. Known: {', '.join(sorted(all_presets()))}."
         )
     return flatten_presets(
         profiles_root=profiles_root,
@@ -342,4 +421,5 @@ def flatten_printer(
         bed_type=presets.bed_type,
         slicer_path=slicer_path,
         vendor=presets.vendor,
+        slicer=presets.slicer,
     )

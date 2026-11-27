@@ -288,7 +288,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="print3d", description="Idea to a reviewable slicer project for a Bambu Lab X2D, P2S or X1 Carbon, or an Elegoo Centauri Carbon or Carbon 2"
+        prog="print3d", description="Idea to a reviewable slicer project for a Bambu Lab X2D, P2S or X1 Carbon, an Elegoo Centauri Carbon or Carbon 2, or an OrcaSlicer printer"
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
 
@@ -422,8 +422,8 @@ def build_parser() -> argparse.ArgumentParser:
     printer_cmd.add_argument("choose", nargs="?", help=f"One of: {', '.join(printers.available())}")
     printer_cmd.set_defaults(func=cmd_printer)
 
-    flatten_cmd = sub.add_parser("flatten", help="Rebuild a printer's pinned presets from its slicer's")
-    flatten_cmd.add_argument("--printer", choices=sorted(printers.PRESETS),
+    flatten_cmd = sub.add_parser("flatten", help="Rebuild a printer's presets from its slicer's")
+    flatten_cmd.add_argument("--printer", choices=sorted(printers.all_presets()),
                              help="Default: the printer print3d slices for")
     flatten_cmd.add_argument("--output", help="Default: src/print3d/profiles/<printer>")
     flatten_cmd.add_argument("--profiles-root", help="The slicer's system profiles (default: found from the install)")
